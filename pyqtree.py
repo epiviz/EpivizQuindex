@@ -76,6 +76,7 @@ This code is free to share, use, reuse, and modify according to the MIT license,
 """
 
 __version__ = "1.0.0"
+disk = "./tree.b"
 
 #PYTHON VERSION CHECK
 import sys
@@ -125,7 +126,8 @@ class _QuadTree(object):
     user-friendly version.
     """
 
-    def __init__(self, x, y, width, height, max_items, max_depth, _depth=0):
+    def __init__(self, x, y, width, height, max_items, max_depth, _depth=0, parentID):
+
         self.nodes = []
         self.children = []
         self.center = (x, y)
@@ -133,6 +135,7 @@ class _QuadTree(object):
         self.max_items = max_items
         self.max_depth = max_depth
         self._depth = _depth
+        self.treeId = parentID + (position << (2*_depth))
 
     def __iter__(self):
         for child in _loopallchildren(self):
@@ -233,13 +236,13 @@ class _QuadTree(object):
         y2 = self.center[1] + quartheight
         new_depth = self._depth + 1
         self.children = [_QuadTree(x1, y1, halfwidth, halfheight,
-                                   self.max_items, self.max_depth, new_depth),
+                                   self.max_items, self.max_depth, new_depth, self.treeId, 3),
                          _QuadTree(x1, y2, halfwidth, halfheight,
-                                   self.max_items, self.max_depth, new_depth),
+                                   self.max_items, self.max_depth, new_depth self.treeId, 1),
                          _QuadTree(x2, y1, halfwidth, halfheight,
-                                   self.max_items, self.max_depth, new_depth),
+                                   self.max_items, self.max_depth, new_depth self.treeId, 4),
                          _QuadTree(x2, y2, halfwidth, halfheight,
-                                   self.max_items, self.max_depth, new_depth)]
+                                   self.max_items, self.max_depth, new_depth self.treeId, 2)]
         nodes = self.nodes
         self.nodes = []
         for node in nodes:
@@ -303,6 +306,9 @@ class Index(_QuadTree):
             occurs and the bottommost quad nodes may grow indefinately. Default is 20.
         """
         if bbox is not None:
+            with open(disk, 'rb+') as f:
+                f.write(pack('qii', 0x45504951, MAX_ITEMS, 64, 64))
+                # mgic, max children, offset to start, offset to next
             x1, y1, x2, y2 = bbox
             width, height = abs(x2-x1), abs(y2-y1)
             midx, midy = x1+width/2.0, y1+height/2.0
