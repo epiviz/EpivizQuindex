@@ -273,6 +273,7 @@ class _QuadTree(object):
                         print(offset + 40 + (MAX_ITEMS + 1) * itemSize)
                         f.seek(1760)
                         print(f.read(32))
+                        print("print children")
                         print(children)
                         self._insert(item, rect, children[0])
                     if rect[3] >= y:
@@ -348,7 +349,9 @@ class _QuadTree(object):
                 print(offset)
                 print(offset + 40 + (MAX_ITEMS + 1) * itemSize)
                 f.seek(1760)
+                a = f.read(32)
                 print(f.read(32))
+                print(unpack("llll", a))
                 self._insert_into_children(node[0], node[1], offset)
 
     def __len__(self):
