@@ -76,10 +76,13 @@ This code is free to share, use, reuse, and modify according to the MIT license,
 """
 
 __version__ = "1.0.0"
-disk = "./tree.b"
+disk = "./f.b"
+nodeSize = 864
+itemSize = 72
 
 #PYTHON VERSION CHECK
-import sys
+import sys, os
+from struct import *
 PYTHON3 = int(sys.version[0]) == 3
 if PYTHON3:
     xrange = range
@@ -126,31 +129,68 @@ class _QuadTree(object):
     user-friendly version.
     """
 
-    def __init__(self, x, y, width, height, max_items, max_depth, _depth=0, parentID):
+    # def __init__(self, x, y, width, height, max_items, max_depth, _depth=0, fileOffset):
+    def __init__(self, x, y, width, height, max_items, max_depth, _depth, offset):
 
-        self.nodes = []
-        self.children = []
-        self.center = (x, y)
-        self.width, self.height = width, height
+        with open(disk, 'rb+') as f:
+            f.seek(offset)
+            output = pack('ddddl', x, y, width, height, _depth)
+            for x in range(0, max_items + 1):
+                # pad items
+                output += pack('llllldddd', 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            output += pack('llll', 0,0,0,0)
+            f.write(output)
+
+
+        # self.nodes = []
+        # self.children = []
+        # self.center = (x, y)
+        # self.width, self.height = width, height
         self.max_items = max_items
         self.max_depth = max_depth
-        self._depth = _depth
-        self.treeId = parentID + (position << (2*_depth))
+        # self._depth = _depth
 
     def __iter__(self):
         for child in _loopallchildren(self):
             yield child
 
-    def _insert(self, item, bbox):
-        rect = _normalize_rect(bbox)
-        if len(self.children) == 0:
-            node = _QuadNode(item, rect)
-            self.nodes.append(node)
+    def hasChildren(self, offset):
+        if offset == 0:
+            # print()
+            raise(Exception(os.path.getsize(disk)))
+        c = False
+        with open(disk, 'rb+') as f:
+            f.seek(offset + 40 + (MAX_ITEMS + 1) * itemSize)
+            print(offset)
+            c = unpack("l", f.read(8))[0] is not 0
+            f.seek(-8, 1)
+            print("at hasChildren ", offset, unpack("llll", f.read(32)), c)
+        return c
 
-            if len(self.nodes) > self.max_items and self._depth < self.max_depth:
-                self._split()
+
+    def _insert(self, item, bbox, offset):
+        rect = _normalize_rect(bbox)
+        if not self.hasChildren(offset):
+            node = (item, rect)
+            print(offset)
+            # self.nodes.append(node)
+            with open(disk, 'rb+') as f:
+                f.seek(offset + 40)
+                counter = 0
+                while True:
+                    counter += 1
+                    a = unpack("llllldddd",f.read(72))
+                    print(a)
+                    if a[2] == 0:
+                        f.seek(-72, 1)
+                        f.write(pack("llllldddd", item[0], item[1], item[2], item[3], item[4], rect[0], rect[1], rect[2], rect[3]))
+                        break
+            # if counter > self.max_items and self._depth < self.max_depth:
+            if counter > self.max_items:
+                self._split(offset)
         else:
-            self._insert_into_children(item, rect)
+            # print(item, rect, offset)
+            self._insert_into_children(item, rect, offset)
 
     def _remove(self, item, bbox):
         rect = _normalize_rect(bbox)
@@ -160,51 +200,88 @@ class _QuadTree(object):
         else:
             self._remove_from_children(item, rect)
 
-    def _intersect(self, rect, results=None, uniq=None):
+    def _intersect(self, rect, offset, results=None, uniq=None):
         if results is None:
             rect = _normalize_rect(rect)
             results = []
             uniq = set()
         # search children
-        if self.children:
-            if rect[0] <= self.center[0]:
-                if rect[1] <= self.center[1]:
-                    self.children[0]._intersect(rect, results, uniq)
-                if rect[3] >= self.center[1]:
-                    self.children[1]._intersect(rect, results, uniq)
-            if rect[2] >= self.center[0]:
-                if rect[1] <= self.center[1]:
-                    self.children[2]._intersect(rect, results, uniq)
-                if rect[3] >= self.center[1]:
-                    self.children[3]._intersect(rect, results, uniq)
-        # search node at this level
-        for node in self.nodes:
-            _id = id(node.item)
-            if (_id not in uniq and
-                node.rect[2] >= rect[0] and node.rect[0] <= rect[2] and
-                node.rect[3] >= rect[1] and node.rect[1] <= rect[3]):
-                results.append(node.item)
-                uniq.add(_id)
+        with open(disk, 'rb+') as f:
+            if self.hasChildren(offset):
+                f.seek(offset)
+                (x, y, width, height, depth) = unpack("ddddl", f.read(40))
+                f.seek((MAX_ITEMS + 1) * nodeSize, 1)
+                children = unpack("llll", f.read(32))
+                if rect[0] <= x:
+                    if rect[1] <= y:
+                        self._intersect(rect, children[0], results, uniq)
+                    if rect[3] >= y:
+                        self._intersect(rect, children[1], results, uniq)
+                if rect[2] >= x:
+                    if rect[1] <= y:
+                        self._intersect(rect, children[2], results, uniq)
+                    if rect[3] >= y:
+                        self._intersect(rect, children[3], results, uniq)
+            # search node at this level
+
+            f.seek(offset + 40)
+            counter = 0
+            nodes = []
+            while True and counter < 11:
+                counter += 1
+                node = unpack("llllldddd", f.read(72))
+                if node[2] == 0:
+                    break
+                else:
+                    nodes.append(((node[0], node[1], node[2], node[3], node[4]), (node[5], node[6], node[7], node[8])))
+
+            for node in nodes:
+                _id = id(node[0])
+                if (_id not in uniq and
+                    node[1][2] >= rect[0] and node[1][0] <= rect[2] and
+                    node[1][3] >= rect[1] and node[1][1] <= rect[3]):
+                    results.append(node[0])
+                    uniq.add(_id)
         return results
 
-    def _insert_into_children(self, item, rect):
-        # if rect spans center then insert here
-        if (rect[0] <= self.center[0] and rect[2] >= self.center[0] and
-            rect[1] <= self.center[1] and rect[3] >= self.center[1]):
-            node = _QuadNode(item, rect)
-            self.nodes.append(node)
-        else:
-            # try to insert into children
-            if rect[0] <= self.center[0]:
-                if rect[1] <= self.center[1]:
-                    self.children[0]._insert(item, rect)
-                if rect[3] >= self.center[1]:
-                    self.children[1]._insert(item, rect)
-            if rect[2] > self.center[0]:
-                if rect[1] <= self.center[1]:
-                    self.children[2]._insert(item, rect)
-                if rect[3] >= self.center[1]:
-                    self.children[3]._insert(item, rect)
+    def _insert_into_children(self, item, rect, offset):
+        with open(disk, 'rb+') as f:
+            f.seek(offset)                
+            # print(offset)
+            # print(os.path.getsize(disk))
+            (x, y, width, height, depth) = unpack("ddddl", f.read(40))
+
+            # if rect spans center then insert here
+            if (rect[0] <= x and rect[2] >= x and
+                rect[1] <= y and rect[3] >= y):
+                # when exceeds 11 items it discards it
+                # TODO: fix this
+                counter = 0
+                while counter < 11:
+                    counter += 1
+                    if unpack("llllldddd", f.read(72))[2] == 0:
+                        f.seek(-72, 1)
+                        f.write(pack("llllldddd", item[0], item[1], item[2], item[3], item[4], rect[0], rect[1], rect[2], rect[3]))
+                        break
+            else:
+                # try to insert into children
+                f.seek(offset + 40 + (MAX_ITEMS + 1) * itemSize)
+                children = unpack("llll", f.read(32))
+                if rect[0] <= x:
+                    if rect[1] <= y:
+                        print(offset)
+                        print(offset + 40 + (MAX_ITEMS + 1) * itemSize)
+                        f.seek(1760)
+                        print(f.read(32))
+                        print(children)
+                        self._insert(item, rect, children[0])
+                    if rect[3] >= y:
+                        self._insert(item, rect, children[1])
+                if rect[2] > x:
+                    if rect[1] <= y:
+                        self._insert(item, rect, children[2])
+                    if rect[3] >= y:
+                        self._insert(item, rect, children[3])
 
     def _remove_from_children(self, item, rect):
         # if rect spans center then insert here
@@ -225,28 +302,54 @@ class _QuadTree(object):
                 if rect[3] >= self.center[1]:
                     self.children[3]._remove(item, rect)
 
-    def _split(self):
-        quartwidth = self.width / 4.0
-        quartheight = self.height / 4.0
-        halfwidth = self.width / 2.0
-        halfheight = self.height / 2.0
-        x1 = self.center[0] - quartwidth
-        x2 = self.center[0] + quartwidth
-        y1 = self.center[1] - quartheight
-        y2 = self.center[1] + quartheight
-        new_depth = self._depth + 1
-        self.children = [_QuadTree(x1, y1, halfwidth, halfheight,
-                                   self.max_items, self.max_depth, new_depth, self.treeId, 3),
-                         _QuadTree(x1, y2, halfwidth, halfheight,
-                                   self.max_items, self.max_depth, new_depth self.treeId, 1),
-                         _QuadTree(x2, y1, halfwidth, halfheight,
-                                   self.max_items, self.max_depth, new_depth self.treeId, 4),
-                         _QuadTree(x2, y2, halfwidth, halfheight,
-                                   self.max_items, self.max_depth, new_depth self.treeId, 2)]
-        nodes = self.nodes
-        self.nodes = []
-        for node in nodes:
-            self._insert_into_children(node.item, node.rect)
+    def _split(self, offset):
+        with open(disk, 'rb+') as f:
+            print(offset)
+            f.seek(offset)
+            (x, y, width, height, depth) = unpack("ddddl", f.read(40))
+
+            quartwidth = width / 4.0
+            quartheight = height / 4.0
+            halfwidth = width / 2.0
+            halfheight = height / 2.0
+            x1 = x - quartwidth
+            x2 = x + quartwidth
+            y1 = y - quartheight
+            y2 = y + quartheight
+            new_depth = depth + 1
+
+            c1 = os.path.getsize(disk)
+            _QuadTree(x1, y1, halfwidth, halfheight,
+                       self.max_items, self.max_depth, new_depth, c1),
+            _QuadTree(x1, y2, halfwidth, halfheight,
+                       self.max_items, self.max_depth, new_depth, c1 + nodeSize),
+            _QuadTree(x2, y1, halfwidth, halfheight,
+                       self.max_items, self.max_depth, new_depth, c1 + nodeSize*2),
+            _QuadTree(x2, y2, halfwidth, halfheight,
+                       self.max_items, self.max_depth, new_depth, c1 + nodeSize*3)
+            # write nodes info to disk
+            f.seek(offset + 40 + (MAX_ITEMS + 1) * itemSize)
+            # print("at split", c1)
+            f.write(pack("llll", c1, c1 + nodeSize, c1 + nodeSize*2, c1 + nodeSize*3))
+
+            # nodes = self.nodes
+            # self.nodes = []
+
+            # read nodes, there should be 11 of them at this point
+            f.seek(offset + 40)
+            nodes = []
+            for x in range(0,11):
+                (start, end, fOffset, length, fileName, x1,y1,x2,y2) = unpack("llllldddd", f.read(72))
+                f.seek(-72,1)
+                f.write(pack("llllldddd", 0,0,0,0,0,0,0,0,0))
+                nodes.append(((start, end, fOffset, length, fileName), (x1,y1,x2,y2)))
+            for node in nodes:
+                print(node)
+                print(offset)
+                print(offset + 40 + (MAX_ITEMS + 1) * itemSize)
+                f.seek(1760)
+                print(f.read(32))
+                self._insert_into_children(node[0], node[1], offset)
 
     def __len__(self):
         """
@@ -267,52 +370,17 @@ MAX_DEPTH = 20
 
 
 class Index(_QuadTree):
-    """
-    The top spatial index to be created by the user. Once created it can be
-    populated with geographically placed members that can later be tested for
-    intersection with a user inputted geographic bounding box. Note that the
-    index can be iterated through in a for-statement, which loops through all
-    all the quad instances and lets you access their properties.
-
-    Example usage:
-
-    >>> spindex = Index(bbox=(0, 0, 100, 100))
-    >>> spindex.insert('duck', (50, 30, 53, 60))
-    >>> spindex.insert('cookie', (10, 20, 15, 25))
-    >>> spindex.insert('python', (40, 50, 95, 90))
-    >>> results = spindex.intersect((51, 51, 86, 86))
-    >>> sorted(results)
-    ['duck', 'python']
-    """
 
     def __init__(self, bbox=None, x=None, y=None, width=None, height=None, max_items=MAX_ITEMS, max_depth=MAX_DEPTH):
-        """
-        Initiate by specifying either 1) a bbox to keep track of, or 2) with an xy centerpoint and a width and height.
-
-        Parameters:
-        - **bbox**: The coordinate system bounding box of the area that the quadtree should
-            keep track of, as a 4-length sequence (xmin,ymin,xmax,ymax)
-        - **x**:
-            The x center coordinate of the area that the quadtree should keep track of.
-        - **y**
-            The y center coordinate of the area that the quadtree should keep track of.
-        - **width**:
-            How far from the xcenter that the quadtree should look when keeping track.
-        - **height**:
-            How far from the ycenter that the quadtree should look when keeping track
-        - **max_items** (optional): The maximum number of items allowed per quad before splitting
-            up into four new subquads. Default is 10.
-        - **max_depth** (optional): The maximum levels of nested subquads, after which no more splitting
-            occurs and the bottommost quad nodes may grow indefinately. Default is 20.
-        """
         if bbox is not None:
-            with open(disk, 'rb+') as f:
-                f.write(pack('qii', 0x45504951, MAX_ITEMS, 64, 64))
-                # mgic, max children, offset to start, offset to next
+                
             x1, y1, x2, y2 = bbox
+            with open(disk, 'wb') as f:
+                f.write(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0))
+                # mgic, max children, offset to start, offset to next, x1 y1 x2 y2, padding
             width, height = abs(x2-x1), abs(y2-y1)
             midx, midy = x1+width/2.0, y1+height/2.0
-            super(Index, self).__init__(midx, midy, width, height, max_items, max_depth)
+            super(Index, self).__init__(midx, midy, width, height, max_items, max_depth, 0, 64)
 
         elif None not in (x, y, width, height):
             super(Index, self).__init__(x, y, width, height, max_items, max_depth)
@@ -320,6 +388,8 @@ class Index(_QuadTree):
         else:
             raise Exception("Either the bbox argument must be set, or the x, y, width, and height arguments must be set")
 
+    def get():
+        pass
     def insert(self, item, bbox):
         """
         Inserts an item into the quadtree along with its bounding box.
@@ -328,7 +398,7 @@ class Index(_QuadTree):
         - **item**: The item to insert into the index, which will be returned by the intersection method
         - **bbox**: The spatial bounding box tuple of the item, with four members (xmin,ymin,xmax,ymax)
         """
-        self._insert(item, bbox)
+        self._insert(item, bbox, 64)
 
     def remove(self, item, bbox):
         """
@@ -353,4 +423,4 @@ class Index(_QuadTree):
         Returns:
         - A list of inserted items whose bounding boxes intersect with the input bbox.
         """
-        return self._intersect(bbox)
+        return self._intersect(bbox, 64)

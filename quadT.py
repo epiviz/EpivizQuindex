@@ -22,16 +22,16 @@ data = pickle.load(open( "result1.p", "rb"))
 print(len(data))
 for entry in data:
     # print(entry)
-    (start, end, offset, length, fileName) = (entry[0], entry[1], entry[2], entry[3], "39033")
+    (start, end, offset, length, fileName) = (entry[0], entry[1], entry[2], entry[3], 1)
     tree.insert((start, end, offset, length, fileName), (start//16000, start%16000, start//16000 + 1, start%16000 + 1))
 
 
-data = pickle.load(open( "result2.p", "rb"))
-print(len(data))
-for entry in data:
-    # print(entry)
-    (start, end, offset, length, fileName) = (entry[1], entry[3], entry[4], entry[5], "39031")
-    tree.insert((start, end, offset, length, fileName), (start//16000, start%16000, start//16000 + 1, start%16000 + 1))
+# data = pickle.load(open( "result2.p", "rb"))
+# print(len(data))
+# for entry in data:
+#     # print(entry)
+#     (start, end, offset, length, fileName) = (entry[1], entry[3], entry[4], entry[5], "39031")
+#     tree.insert((start, end, offset, length, fileName), (start//16000, start%16000, start//16000 + 1, start%16000 + 1))
 
 
 
