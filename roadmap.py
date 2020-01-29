@@ -112,7 +112,7 @@ def query_quadtree(chr, start, end, files):
 
     print("xstart, ystart, xend, yend", xstart, ystart, xend, yend)
     margin = 10
-    overlapbbox = (0, 0, xend + margin, yend + margin)
+    overlapbbox = (xstart - margin, ystart - margin, xend + margin, yend + margin)
     matches = tree.intersect(overlapbbox)
 
     df = pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid"])

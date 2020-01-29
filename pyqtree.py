@@ -192,7 +192,7 @@ class _QuadTree(object):
             counter = 0
             while True:
                 counter += 1
-                a = unpack("llllldddd", self.f.read(72))
+                a = unpack("llllldddd", self.f.read(itemSize))
                 # print(a)
                 if a[2] == 0:
                     self.f.seek(-72, 1)
@@ -248,7 +248,7 @@ class _QuadTree(object):
         self.f.seek(offset + 40)
         counter = 0
         nodes = []
-        while True and counter < 11:
+        while True and counter < MAX_ITEMS + 1:
             counter += 1
             node = unpack("llllldddd", self.f.read(72))
             if node[2] == 0:
@@ -278,9 +278,9 @@ class _QuadTree(object):
             # when exceeds 11 items it discards it
             # TODO: fix this
             counter = 0
-            while counter < 11:
+            while counter < MAX_ITEMS + 1:
                 counter += 1
-                if unpack("llllldddd", self.f.read(72))[2] == 0:
+                if unpack("llllldddd", self.f.read(itemSize))[2] == 0:
                     self.f.seek(-72, 1)
                     self.f.write(pack("llllldddd", item[0], item[1], item[2], item[3], item[4], rect[0], rect[1], rect[2], rect[3]))
                     break
@@ -292,7 +292,8 @@ class _QuadTree(object):
                 if rect[1] <= y:
                     # print(offset)
                     # print(offset + 40 + (MAX_ITEMS + 1) * itemSize)
-                    self.f.seek(1760)
+                    # self.f.seek(1760) CHECK
+                    # self.f.seek(offset + 40 + (MAX_ITEMS + 1) * itemSize)
                     # print(self.f.read(32))
                     # print("print children")
                     # print(children)
@@ -360,7 +361,7 @@ class _QuadTree(object):
         # read nodes, there should be 11 of them at this point
         self.f.seek(offset + 40)
         nodes = []
-        for x in range(0,11):
+        for x in range(0,MAX_ITEMS + 1):
             (start, end, fOffset, length, fileName, x1,y1,x2,y2) = unpack("llllldddd", self.f.read(72))
             self.f.seek(-72,1)
             self.f.write(pack("llllldddd", 0,0,0,0,0,0,0,0,0))
@@ -369,7 +370,7 @@ class _QuadTree(object):
             # print(node)
             # print(offset)
             # print(offset + 40 + (MAX_ITEMS + 1) * itemSize)
-            self.f.seek(1760)
+            self.f.seek(offset + 40 + (MAX_ITEMS + 1) * itemSize)
             a = self.f.read(32)
             # print(self.f.read(32))
             # print(unpack("llll", a))
