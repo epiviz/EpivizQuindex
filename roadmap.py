@@ -111,7 +111,7 @@ def query_quadtree(chr, start, end, files):
     xend, yend, _ = hcoords(end, chromLength)
 
     print("xstart, ystart, xend, yend", xstart, ystart, xend, yend)
-    margin = 10
+    margin = 200
     overlapbbox = (xstart - margin, ystart - margin, xend + margin, yend + margin)
     matches = tree.intersect(overlapbbox)
 
@@ -119,7 +119,7 @@ def query_quadtree(chr, start, end, files):
     print("before file filter")
     print(df.shape)
     print(df)
-    df = df[df["fileid"].isin(files)]
+    df = df[(df["fileid"].isin(files)) & (df["start"] <= end) & (df["end"] >= start)]
     print("after file filter")
     print(df.shape)
     print(df)
@@ -185,6 +185,7 @@ for trange in ranges:
                         row["offset"], row["size"])
         resultDf = pandas.DataFrame(result, columns = ["chr", "start", "end", "score"])
         print(resultDf.head())
+        print(resultDf.shape)
         # exit();
     # print(result)
     
