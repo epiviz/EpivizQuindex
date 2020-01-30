@@ -260,14 +260,15 @@ class _QuadTree(object):
 
         for node in nodes:
             _id = id(node[0])
-            if (_id not in uniq and box_intersect(node[1], rect)):
+            if (_id not in uniq and self.box_intersect(node[1], rect)):
                 results.append(node[0])
                 uniq.add(_id)
         return results
 
-    def box_intersect(box1, box2):
-        p1 = Polygon(box1)
-        p2 = Polygon(box2)
+    def box_intersect(self, box1, box2):
+        # print(box1, box2)
+        p1 = Polygon([(box1[0], box1[1]), (box1[0], box1[3]), (box1[2], box1[3]), (box1[2], box1[1])])
+        p2 = Polygon([(box2[0], box2[1]), (box2[0], box2[3]), (box2[2], box2[3]), (box2[2], box2[1])])
         return p1.intersects(p2)
 
 
