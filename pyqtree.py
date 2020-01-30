@@ -88,6 +88,8 @@ nodeSize = 40 + ((MAX_ITEMS + 1) * itemSize) + 32
 #PYTHON VERSION CHECK
 import sys, os
 from struct import *
+from shapely.geometry import Polygon
+
 PYTHON3 = int(sys.version[0]) == 3
 if PYTHON3:
     xrange = range
@@ -258,13 +260,18 @@ class _QuadTree(object):
 
         for node in nodes:
             _id = id(node[0])
-            if (_id not in uniq and
-                node[1][2] >= rect[0] and node[1][0] <= rect[2] and
-                node[1][3] >= rect[1] and node[1][1] <= rect[3]):
+            if (_id not in uniq and box_intersect(node[1], rect)):
                 results.append(node[0])
                 uniq.add(_id)
         return results
 
+    def box_intersect(box1, box2):
+        p1 = Polygon(box1)
+        p2 = Polygon(box2)
+        return p1.intersects(p2)
+
+
+        
     def _insert_into_children(self, item, rect, offset):
         # with open(self.disk, 'rb+') as f:
         self.f.seek(offset)                
