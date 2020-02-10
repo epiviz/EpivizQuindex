@@ -23,6 +23,56 @@ def hcoords(x, chromLength, dims = 2):
     [x,y] = hilbert_curve.coordinates_from_distance(x)
     return x, y, hlevel
 
+# query : dictionary with 2 items, start and end
+# hilbert_curve: HilbertCurve object
+def range2bbox(hlevel, query, dims = 2):
+    # query = {
+    #     "start": 0,
+    #     "end":  127074
+    #     }
+    hilbert_curve = HilbertCurve(hlevel, dims)
+    inc = 0
+    # ite = 0
+    start = query["start"]+1
+    points = []
+    if start%4 is 1:
+        points.append(start)
+        start += 1
+    if start%4 is 2:
+        points.append(start)
+        start += 1
+    if start%4 is 3: 
+        points.append(start)
+        start += 1 
+    points.append(start)
+
+    # assume at this ppoint, start is always at the end of a level 0
+    while start < query["end"] + 1:
+        # ite += 1
+        # print(inc)
+        # locate the proper power incrementer
+        while start % (4**(inc+1)) == 0:
+            inc += 1
+        while inc >= 0:
+            if start + (4**inc) <= query["end"] + 1:
+                points.append(start + 1)
+                points.append(start + (4 ** inc))
+                start += 4 ** inc
+                break
+            else:
+                inc = inc - 1
+
+    # print(points)
+    hillcorX = []
+    hillcorY = []
+    for point in points:
+        [x,y] = hilbert_curve.coordinates_from_distance(point)
+        hillcorX.append(x)
+        hillcorY.append(y)
+    bbox = (min(hillcorX), min(hillcorY), max(hillcorX), max(hillcorY))
+    # print(bbox)
+    return bbox
+
 chromosomes = {
     "chr1": 249250621, 
     "chr10": 135534747, 
@@ -50,8 +100,8 @@ chromosomes = {
     "chrX": 155270560, 
     "chrY": 59373566
 }
-
-f = open("quadtree/chrmids.json")
+# f = open("quadtree/chrmids.json")
+f = open("chrmids.json")
 chromIndexes = json.loads(f.read())
 
 fileIds = {}
@@ -74,7 +124,8 @@ def create_quadTree(chr):
     # f = open("quadtree/chrmids.json")
     # chromIndexes = json.loads(f)
     
-    tree = Index(bbox=(0, 0, x_y_dim, x_y_dim), disk="quadtree/indexes/roadmap." + chr + ".quadtree.index", first_run=True)
+    # tree = Index(bbox=(0, 0, x_y_dim, x_y_dim), disk="quadtree/indexes/roadmap." + chr + ".quadtree.index", first_run=True)
+    tree = Index(bbox=(0, 0, x_y_dim, x_y_dim), disk = "./roadmap." + chr + ".quadtree.index")
 
     for file in chromIndexes.keys():
         print("\t file - ", file)
@@ -87,8 +138,9 @@ def create_quadTree(chr):
             for i, row in df.iterrows():
                 # print(row)
                 x_start, y_start, _ = hcoords(row["rStartBase"], chromLength)
-                x_end, y_end, _ = hcoords(row["rEndBase"], chromLength)
-                tree.insert((row["rStartBase"], row["rEndBase"], row["rdataOffset"], row["rDataSize"], fileIds[file]), (x_start, y_start, x_end, y_end))
+                x_end, y_end, hlevel = hcoords(row["rEndBase"], chromLength)
+                bbox = range2bbox(hlevel, {"start":row["rStartBase"], "end":row["rEndBase"]})
+                tree.insert((row["rStartBase"], row["rEndBase"], row["rdataOffset"], row["rDataSize"], fileIds[file]), bbox)
         else:
             print("\t !!!!!!! chrm doesn't exist - ", file)
 
@@ -105,13 +157,14 @@ def query_quadtree(chr, start, end, files):
     print("hlevel", hlevel)
     x_y_dim = math.ceil(math.pow(2, hlevel))
     print("max x|y =", x_y_dim)
-    tree = Index(bbox=(0, 0, x_y_dim, x_y_dim), disk = "quadtree/indexes/roadmap." + chr + ".quadtree.index")
+    # tree = Index(bbox=(0, 0, x_y_dim, x_y_dim), disk = "quadtree/indexes/roadmap." + chr + ".quadtree.index")
+    tree = Index(bbox=(0, 0, x_y_dim, x_y_dim), disk = "./roadmap." + chr + ".quadtree.index")
 
     xstart, ystart, _ = hcoords(start, chromLength)
     xend, yend, _ = hcoords(end, chromLength)
 
     print("xstart, ystart, xend, yend", xstart, ystart, xend, yend)
-    margin = 200
+    margin = 0
     overlapbbox = (xstart - margin, ystart - margin, xend + margin, yend + margin)
     matches = tree.intersect(overlapbbox)
 
