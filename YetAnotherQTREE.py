@@ -3,10 +3,10 @@ import sys
 from struct import *
 from shapely.geometry import Polygon
 
-MAX_ITEMS = 10
+MAX_ITEMS = 4
 MAX_DEPTH = 20
 item_size = 72
-leaf_size = 40 + 1 + ((MAX_ITEMS) * item_size)
+# leaf_size = 40 + 1 + ((MAX_ITEMS) * item_size)
 parent_size = 40 + 1 + 32
 
 def _normalize_rect(rect):
@@ -77,7 +77,7 @@ class _QuadTree(object):
             self.nodes.append(node)
 
             if len(self.nodes) > self.max_items and self._depth < self.max_depth:
-                self.isLeaf == True 
+                self.isLeaf == False 
                 self._split()
         else:
             self._insert_into_children(item, rect)
@@ -142,7 +142,9 @@ class _QuadTree(object):
                 # print("intersect some leaf levels")
                 nodes = []
                 counter = 0
-                while counter < MAX_ITEMS:
+                (num_items) = unpack("l", f.read(8))
+                print(num_items, (x, y, width, height, depth, isLeaf))
+                while counter < num_items[0]:
                     counter += 1
                     node = unpack("llllldddd", f.read(72))
                     # print(node)
@@ -167,13 +169,18 @@ class _QuadTree(object):
         if rect[0] <= self.center[0]:
             if rect[1] <= self.center[1]:
                 self.children[0]._insert(item, rect)
-            if rect[3] >= self.center[1]:
+                return
+            elif rect[3] >= self.center[1]:
                 self.children[1]._insert(item, rect)
-        if rect[2] > self.center[0]:
+                return
+        elif rect[2] > self.center[0]:
             if rect[1] <= self.center[1]:
                 self.children[2]._insert(item, rect)
-            if rect[3] >= self.center[1]:
+                return
+            elif rect[3] >= self.center[1]:
                 self.children[3]._insert(item, rect)
+                return
+        raise Exception()
 
     def _remove_from_children(self, item, rect):
         # if rect spans center then insert here
@@ -250,7 +257,8 @@ class _QuadTree(object):
                 if len(c.children) is not 0:
                     position += parent_size
                 elif len(c.nodes) is not 0:
-                    position += leaf_size
+                    position += 48 + 1 + ((len(c.nodes)) * item_size)
+                    # print(40 + 1 + ((len(c.nodes)) * item_size))
                 else: 
                     # print("empty")
                     children_position[-1] = -1
@@ -261,6 +269,8 @@ class _QuadTree(object):
             # leaf node
             # print("writing a leaf node")
             barray += pack('?', 1)
+            barray += pack('l', len(self.nodes))
+            # print(len(self.nodes), position)
             # print("in ctd:", len(barray))
             # print(unpack("ddddl?", barray))
             children = []
@@ -271,7 +281,7 @@ class _QuadTree(object):
             # pad to leaf node length
             # now this is for easy file location calculation, we can probably design more
             # delicate structure to save some space
-            barray += (MAX_ITEMS - len(self.nodes)) * pack("llllldddd", 0,0,0,0,0,0,0,0,0)
+            # barray += (MAX_ITEMS - len(self.nodes)) * pack("llllldddd", 0,0,0,0,0,0,0,0,0)
             # print(unpack("ddddl?", barray[0:41]))
         return barray, children, position
 
@@ -380,7 +390,7 @@ class Index(_QuadTree):
             while q:
                 t = q.pop(0)
                 barray, children, position = t.convert_to_disk(position)
-                # print("in to_disk:", len(barray))
+                print("in to_disk:", len(barray))
                 # print(leaf_size)
                 f.write(barray)
                 q += children
