@@ -143,7 +143,7 @@ class _QuadTree(object):
                 nodes = []
                 counter = 0
                 (num_items) = unpack("l", f.read(8))
-                print(num_items, (x, y, width, height, depth, isLeaf))
+                # print(num_items, (x, y, width, height, depth, isLeaf))
                 while counter < num_items[0]:
                     counter += 1
                     node = unpack("llllldddd", f.read(72))
@@ -327,13 +327,12 @@ class Index(_QuadTree):
         self.disk = disk
         if bbox is not None:
             
-
             x1, y1, x2, y2 = bbox
+            self.bbox = bbox
             width, height = abs(x2-x1), abs(y2-y1)
             midx, midy = x1+width/2.0, y1+height/2.0
-            with open(self.disk, 'wb') as f:
-                f.write(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0))
-                print(len(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0)))
+            
+                # print(len(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0)))
             super(Index, self).__init__(midx, midy, width, height, max_items, max_depth)
 
         elif None not in (x, y, width, height):
@@ -376,11 +375,14 @@ class Index(_QuadTree):
     def to_disk(self):
         # defualt filepointer.tell() probably will not work as python reads bytes into 
         # buffer (maybe it works). To keep things undercontrol, we use a manual byte counter.
+                
         q = [self]
         position = 0
         fp = 0
         farray = bytearray()
         with open(self.disk, 'wb') as f:
+            x1, y1, x2, y2 = self.bbox
+            f.write(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0))
             position = 64
             f.seek(64)
             if not super(Index, self).IsParent():
@@ -390,7 +392,7 @@ class Index(_QuadTree):
             while q:
                 t = q.pop(0)
                 barray, children, position = t.convert_to_disk(position)
-                print("in to_disk:", len(barray))
+                # print("in to_disk:", len(barray))
                 # print(leaf_size)
                 f.write(barray)
                 q += children
