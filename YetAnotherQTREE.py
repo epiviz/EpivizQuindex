@@ -3,7 +3,7 @@ import sys
 from struct import *
 from shapely.geometry import Polygon
 
-MAX_ITEMS = 3
+MAX_ITEMS = 256
 MAX_DEPTH = 20
 item_size = 72
 # leaf_size = 48 + 1 + ((Item_numbers) * item_size)
