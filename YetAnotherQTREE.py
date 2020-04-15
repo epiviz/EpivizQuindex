@@ -137,113 +137,71 @@ class _QuadTree(object):
 
         return (q1, q2, q3, q4)
 
-    def _intersect(self, rect, f_path, offset = None, results=None):
-        # print(rect)
+    def _intersect_memory(self, bbox, results = None, debug = False):
         if results is None:
-            # rect = _normalize_rect(rect)
+            results = []
+
+        if not self.isLeaf:
+            if self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1], self.center[0], self.center[1] + self.height/2)):
+                self.children[1]._intersect_memory(rect, results)
+            if self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0], self.center[1])):
+                self.children[2]._intersect_memory(rect, results)
+            if self.box_intersect(rect, (self.center[0], self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1])):
+                self.children[3]._intersect_memory(rect, results)
+            if self.box_intersect(rect, (self.center[0], self.center[1], self.center[0] + self.width/2, self.center[1] + self.height/2)):
+                self.children[0]._intersect_memory(rect, results)
+
+        for node in self.nodes:
+            if self.box_intersect(rect, node[1]):
+            # (
+                if debug:
+                    results.append(node[0] + node[1])
+                else:
+                    results.append(node[0])
+        return results
+
+    def _intersect_file(self, rect, f_path, offset = None, results=None, debug = False):
+        if results is None:
             results = []
         if offset is -1:
-            # print("found empty")
             return results
         if offset is None:
             raise Exception("memory search not implemented")
         with open(f_path, 'rb') as f:
-            # print("offset: ", offset)
             f.seek(offset)
             a = f.read(48 + 1)
             if offset < 64:
                 raise Exception()
-            # print(len(a))
             (x, y, width, height, depth, num_items, isLeaf) = unpack("ddddll?", a)
-            # print(x,y,width,height, num_items, isLeaf)
             # search children
             if not isLeaf:
                 children = unpack("llll", f.read(32))
-                # print(children)
-                # if rect[0] <= self.center[0]:
-                #     if rect[1] <= self.center[1]:
-                #         # self.children[0]._intersect(rect, results, uniq)
-                #         self._intersect(rect, f_path, children[0], results)
-
-                #     if rect[3] >= self.center[1]:
-                #         # self.children[1]._intersect(rect, results, uniq)
-                #         self._intersect(rect, f_path, children[1], results)
-                # if rect[2] >= self.center[0]:
-                #     if rect[1] <= self.center[1]:
-                #         # self.children[2]._intersect(rect, results, uniq)
-                #         self._intersect(rect, f_path, children[2], results)
-                #     if rect[3] >= self.center[1]:
-                #         # self.children[3]._intersect(rect, results, uniq)
-                #         self._intersect(rect, f_path, children[3], results)
                 if self.box_intersect(rect, (x - width/2, y, x, y + height/2)):
-                    self._intersect(rect, f_path,children[1], results)
+                    self._intersect_file(rect, f_path,children[1], results)
                 if self.box_intersect(rect, (x - width/2, y - height/2, x, y)):
-                    self._intersect(rect, f_path, children[2], results)
+                    self._intersect_file(rect, f_path, children[2], results)
                 if self.box_intersect(rect, (x, y - height/2, x + width/2, y)):
-                    self._intersect(rect, f_path, children[3], results)
+                    self._intersect_file(rect, f_path, children[3], results)
                 if self.box_intersect(rect, (x, y, x + width/2, y + height/2)):
-                    self._intersect(rect, f_path, children[0], results)
-            # If at leaf, search and compare if uniq
-            # this can be removed. Need test
-            # else:
-                # print("intersect some leaf levels")
+                    self._intersect_file(rect, f_path, children[0], results)
             nodes = []
             counter = 0
-            # (num_items) = unpack("l", f.read(8))
-            # print(num_items, (x, y, width, height, depth, isLeaf))
             while counter < num_items:
                 counter += 1
                 node = unpack("llllldddd", f.read(72))
-                # print(node)
                 if node[2] == 0:
                     break
                 else:
                     nodes.append(((node[0], node[1], node[2], node[3], node[4]), (node[5], node[6], node[7], node[8])))
 
             for node in nodes:
-                # _id = id(node.item)
-                # print(node)
                 if self.box_intersect(rect, node[1]):
-                # (
-                    results.append(node[0])
-                        # uniq.add(_id)
+                    if debug:
+                        results.append(node[0] + node[1])
+                    else:
+                        results.append(node[0])
         return results
 
-    # def _insert_into_children(self, item, rect):
-    #     if rect[0] <= self.center[0]:
-    #         if rect[1] <= self.center[1]:
-    #             self.children[0]._insert(item, rect)
-    #             return
-    #         elif rect[3] >= self.center[1]:
-    #             self.children[1]._insert(item, rect)
-    #             return
-    #     elif rect[2] > self.center[0]:
-    #         if rect[1] <= self.center[1]:
-    #             self.children[2]._insert(item, rect)
-    #             return
-    #         elif rect[3] >= self.center[1]:
-    #             self.children[3]._insert(item, rect)
-    #             return
-    #     raise Exception()
-
-    # def _remove_from_children(self, item, rect):
-    #     # if rect spans center then insert here
-    #     if (rect[0] <= self.center[0] and rect[2] >= self.center[0] and
-    #         rect[1] <= self.center[1] and rect[3] >= self.center[1]):
-    #         node = _QuadNode(item, rect)
-    #         self.nodes.remove(node)
-    #     else:
-    #         # try to remove from children
-    #         if rect[0] <= self.center[0]:
-    #             if rect[1] <= self.center[1]:
-    #                 self.children[0]._remove(item, rect)
-    #             if rect[3] >= self.center[1]:
-    #                 self.children[1]._remove(item, rect)
-    #         if rect[2] > self.center[0]:
-    #             if rect[1] <= self.center[1]:
-    #                 self.children[2]._remove(item, rect)
-    #             if rect[3] >= self.center[1]:
-    #                 self.children[3]._remove(item, rect)
 
     def _split(self):
         quartwidth = self.width / 4.0
@@ -271,66 +229,48 @@ class _QuadTree(object):
             # children if appropriate
             self._insert(node.item, node.rect)
 
-    def __len__(self):
-        """
-        Returns:
-        - A count of the total number of members/items/nodes inserted
-        into this quadtree and all of its child trees.
-        """
-        size = 0
-        for child in self.children:
-            size += len(child)
-        size += len(self.nodes)
-        return size
+    # def __len__(self):
+    #     """
+    #     Returns:
+    #     - A count of the total number of members/items/nodes inserted
+    #     into this quadtree and all of its child trees.
+    #     """
+    #     size = 0
+    #     for child in self.children:
+    #         size += len(child)
+    #     size += len(self.nodes)
+    #     return size
 
     def convert_to_disk(self, position):
         # return a pack of bites and children objects if exist
-        # print("pos: ", position)
         barray = pack('ddddl', self.center[0], self.center[1], self.width, self.height, self._depth)
         barray += pack('l', len(self.nodes))
-        # print(len(barray))
         if len(self.children) is not 0:
-            # print("parent")
             # parent node
             barray += pack('?', 0)
             children = self.children
             children_position = []
             for c in self.children:
                 children_position.append(position)
-                # print(children_position)
                 if len(c.children) is not 0:
                     position += 48 + 1 + 32 + (len(c.nodes) * item_size)
                 elif len(c.nodes) is not 0:
                     position += 48 + 1 + ((len(c.nodes)) * item_size)
                 else: 
-                    # print("empty")
                     children_position[-1] = -1
-            # # print("out loop")
-            # print(children_position)
-            # print(len(barray))
             barray += pack('llll', children_position[0], children_position[1], children_position[2], children_position[3])
         else:
             # leaf node
-            # print("writing a leaf node")
-            # print(self.center[0], self.center[1], self.width, self.height, self._depth)
             barray += pack('?', 1)
-            # print(len(self.nodes), position)
             if len(self.nodes) == 0:
                 return bytearray(), [], position
             children = []
 
-        # print("barray before item, ", len(barray))
-
         for node in self.nodes:
             (item, rect) = (node.item, node.rect)
-            # print("item:", item)
             barray += pack("llllldddd", item[0], item[1], item[2], item[3], item[4], rect[0], rect[1], rect[2], rect[3])
-            # pad to leaf node length
-            # print(unpack("ddddl?", barray[0:41]))
         (x, y, width, height, depth, num_items, isLeaf) = unpack("ddddll?", barray[0:49])
-        # print(x,y,width,height, num_items, isLeaf)
         return barray, children, position
-
 
 
 class Index(_QuadTree):
@@ -407,7 +347,7 @@ class Index(_QuadTree):
         """
         self._remove(item, bbox)
 
-    def intersect(self, bbox):
+    def intersect(self, bbox, in_memory = False, debug = False):
         """
         Intersects an input boundingbox rectangle with all of the items
         contained in the quadtree.
@@ -416,12 +356,14 @@ class Index(_QuadTree):
         Returns:
         - A list of inserted items whose bounding boxes intersect with the input bbox.
         """
-        return self._intersect(bbox, self.disk, 64)
+        if in_memory:
+            return self._intersect_memory(bbox, debug)
+        else:
+            return self._intersect_file(bbox, self.disk, 64, debug = debug)
 
     def to_disk(self):
         # defualt filepointer.tell() probably will not work as python reads bytes into 
         # buffer (maybe it works). To keep things undercontrol, we use a manual byte counter.
-                
         q = [self]
         position = 0
         fp = 0
@@ -431,17 +373,14 @@ class Index(_QuadTree):
             f.write(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0))
             position = 64
             f.seek(64)
-            # print(len(self.nodes))
             if not super(Index, self).IsParent():
                 position += 48 + 1 + 32 + (len(self.nodes) * item_size)
             else:
                 position += 48 + 1 + (len(self.nodes) * item_size)
-            # print(position-64)
+
             while q:
                 t = q.pop(0)
                 barray, children, position = t.convert_to_disk(position)
-                # print("in to_disk:", len(barray))
-                # print(position)
                 f.write(barray)
                 q += children
         return self.disk
