@@ -50,7 +50,7 @@ class _QuadTree(object):
     user-friendly version.
     """
 
-    def __init__(self, x, y, width, height, max_items, max_depth, _depth=0):
+    def __init__(self, x = None, y = None, width = None, height = None, max_items = None, max_depth = None, _depth=0 , path = None, offset = None):
         self.nodes = []
         self.children = []
         self.isLeaf = True
@@ -59,6 +59,8 @@ class _QuadTree(object):
         self.max_items = max_items
         self.max_depth = max_depth
         self._depth = _depth
+        if path:
+            self._from_disk(path, offset)
 
     def __iter__(self):
         for child in _loopallchildren(self):
@@ -89,9 +91,6 @@ class _QuadTree(object):
             ty = y + self.height/2
             by = y - self.height/2
 
-            # print(lx, x, rx)
-            # print(by, y, ty)
-            # print(rect)
             if (x > rect[2] and lx < rect[0] and ty > rect[3] and y < rect[1]):
                 self.children[1]._insert(item, rect)
             elif (rx > rect[2] and x < rect[0] and ty > rect[3] and y < rect[1]):
@@ -114,7 +113,6 @@ class _QuadTree(object):
             self._remove_from_children(item, rect)
 
     def box_intersect(self, box1, box2):
-        # print(box1, box2)
         p1 = Polygon([(box1[0], box1[1]), (box1[0], box1[3]), (box1[2], box1[3]), (box1[2], box1[1])])
         p2 = Polygon([(box2[0], box2[1]), (box2[0], box2[3]), (box2[2], box2[3]), (box2[2], box2[1])])
 
@@ -137,27 +135,27 @@ class _QuadTree(object):
 
         return (q1, q2, q3, q4)
 
-    def _intersect_memory(self, bbox, results = None, debug = False):
+    def _intersect_memory(self, rect, results = None, debug = False):
         if results is None:
             results = []
 
         if not self.isLeaf:
-            if self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1], self.center[0], self.center[1] + self.height/2)):
+            if self.children[1] and self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1], self.center[0], self.center[1] + self.height/2)):
                 self.children[1]._intersect_memory(rect, results)
-            if self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0], self.center[1])):
+            if self.children[2] and self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0], self.center[1])):
                 self.children[2]._intersect_memory(rect, results)
-            if self.box_intersect(rect, (self.center[0], self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1])):
+            if self.children[3] and self.box_intersect(rect, (self.center[0], self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1])):
                 self.children[3]._intersect_memory(rect, results)
-            if self.box_intersect(rect, (self.center[0], self.center[1], self.center[0] + self.width/2, self.center[1] + self.height/2)):
+            if self.children[0] and self.box_intersect(rect, (self.center[0], self.center[1], self.center[0] + self.width/2, self.center[1] + self.height/2)):
                 self.children[0]._intersect_memory(rect, results)
 
         for node in self.nodes:
-            if self.box_intersect(rect, node[1]):
+            if self.box_intersect(rect, node.rect):
             # (
                 if debug:
-                    results.append(node[0] + node[1])
+                    results.append(node.item + node.rect)
                 else:
-                    results.append(node[0])
+                    results.append(node.item)
         return results
 
     def _intersect_file(self, rect, f_path, offset = None, results=None, debug = False):
@@ -202,7 +200,6 @@ class _QuadTree(object):
                         results.append(node[0])
         return results
 
-
     def _split(self):
         quartwidth = self.width / 4.0
         quartheight = self.height / 4.0
@@ -229,19 +226,7 @@ class _QuadTree(object):
             # children if appropriate
             self._insert(node.item, node.rect)
 
-    # def __len__(self):
-    #     """
-    #     Returns:
-    #     - A count of the total number of members/items/nodes inserted
-    #     into this quadtree and all of its child trees.
-    #     """
-    #     size = 0
-    #     for child in self.children:
-    #         size += len(child)
-    #     size += len(self.nodes)
-    #     return size
-
-    def convert_to_disk(self, position):
+    def _to_disk(self, position):
         # return a pack of bites and children objects if exist
         barray = pack('ddddl', self.center[0], self.center[1], self.width, self.height, self._depth)
         barray += pack('l', len(self.nodes))
@@ -272,6 +257,34 @@ class _QuadTree(object):
         (x, y, width, height, depth, num_items, isLeaf) = unpack("ddddll?", barray[0:49])
         return barray, children, position
 
+    def _from_disk(self, f_path, offset):
+        children = []
+        self.center = (0,0)
+        with open(f_path, 'rb') as f:
+            f.seek(offset)
+            
+            (x, y, self.width, self.height, self._depth, num_node, self.isLeaf) = unpack("ddddll?", f.read(49))
+            self.center= (x, y)
+            if not self.isLeaf:
+                children = unpack("llll", f.read(32))
+
+            for x in range(0, num_node):
+                item = unpack("llllldddd", f.read(item_size))
+                node_item = item[0:5]
+                node_rect = item[5:]
+                node = _QuadNode(node_item, node_rect)
+                self.nodes.append(node)
+
+
+        # parse the children outside so that no multiple file pointers opened 
+        self.children = []
+        for child in children:
+            if child is not -1:
+                self.children.append(_QuadTree(path = f_path, offset = child))
+            else:
+                self.children.append(None)
+
+
 
 class Index(_QuadTree):
     """
@@ -291,7 +304,7 @@ class Index(_QuadTree):
     """
 
     # def __init__(self, bbox=None, x=None, y=None, width=None, height=None, max_items=MAX_ITEMS, max_depth=MAX_DEPTH):
-    def __init__(self, bbox=None, x=None, y=None, width=None, height=None, max_items=MAX_ITEMS, max_depth=MAX_DEPTH, disk = "./f.b", first_run=False):
+    def __init__(self, bbox=None, x=None, y=None, width=None, height=None, max_items=MAX_ITEMS, max_depth=MAX_DEPTH, disk = None, first_run=False):
         """
         Initiate by specifying either 1) a bbox to keep track of, or 2) with an xy centerpoint and a width and height.
         Parameters:
@@ -310,15 +323,15 @@ class Index(_QuadTree):
         - **max_depth** (optional): The maximum levels of nested subquads, after which no more splitting
             occurs and the bottommost quad nodes may grow indefinately. Default is 20.
         """
-        self.disk = disk
-        if bbox is not None:
+        if disk:
+            self.from_disk(disk)
+        elif bbox is not None:
             
             x1, y1, x2, y2 = bbox
             self.bbox = bbox
             width, height = abs(x2-x1), abs(y2-y1)
             midx, midy = x1+width/2.0, y1+height/2.0
             
-                # print(len(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0)))
             super(Index, self).__init__(midx, midy, width, height, max_items, max_depth)
 
         elif None not in (x, y, width, height):
@@ -334,7 +347,6 @@ class Index(_QuadTree):
         - **item**: The item to insert into the index, which will be returned by the intersection method
         - **bbox**: The spatial bounding box tuple of the item, with four members (xmin,ymin,xmax,ymax)
         """
-        # print("calling insert")
         self._insert(item, bbox)
 
     def remove(self, item, bbox):
@@ -357,18 +369,33 @@ class Index(_QuadTree):
         - A list of inserted items whose bounding boxes intersect with the input bbox.
         """
         if in_memory:
-            return self._intersect_memory(bbox, debug)
+            return self._intersect_memory(bbox, debug = debug)
         else:
             return self._intersect_file(bbox, self.disk, 64, debug = debug)
 
-    def to_disk(self):
+
+    def from_disk(self, f_path):
+        header = None
+        self.nodes = []
+        with open(f_path, 'rb') as f:
+            header = unpack('qiiiqqqqq', f.read(64))
+        (magic, max_item, _, _, x1, y1, x2, y2, _) = header
+        if magic != 0x45504951:
+            raise Exception("File magic mismatch")
+        self.bbox = (x1, y1, x2, y2)
+        self.max_item = max_item
+
+        self._from_disk(f_path, 64)
+
+    def to_disk(self, path):
         # defualt filepointer.tell() probably will not work as python reads bytes into 
         # buffer (maybe it works). To keep things undercontrol, we use a manual byte counter.
         q = [self]
         position = 0
         fp = 0
         farray = bytearray()
-        with open(self.disk, 'wb') as f:
+        self.disk = path
+        with open(path, 'wb') as f:
             x1, y1, x2, y2 = self.bbox
             f.write(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0))
             position = 64
@@ -380,7 +407,7 @@ class Index(_QuadTree):
 
             while q:
                 t = q.pop(0)
-                barray, children, position = t.convert_to_disk(position)
+                barray, children, position = t._to_disk(position)
                 f.write(barray)
                 q += children
         return self.disk
