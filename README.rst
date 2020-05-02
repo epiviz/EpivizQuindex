@@ -1,109 +1,36 @@
 Pyqtree
 =======
 
-Pyqtree is a pure Python spatial index for GIS or rendering usage. It
-stores and quickly retrieves items from a 2x2 rectangular grid area, and
-grows in depth and detail as more items are added. The actual quad tree
-implementation is adapted from `Matt Rasmussen's compbio
-library <https://github.com/mdrasmus/compbio/blob/master/rasmus/quadtree.py>`__
-and extended for geospatial use.
-
-Platforms
----------
-
-Python 2 and 3.
-
-Dependencies
-------------
-
-Pyqtree is written in pure Python and has no dependencies.
-
-Installing It
--------------
-
-Installing Pyqtree can be done by opening your terminal or commandline
-and typing:
+usage
 
 ::
 
-    pip install pyqtree
+    tree = Index(disk = file_path, first_run = True)
 
-Alternatively, you can simply download the "pyqtree.py" file and place
-it anywhere Python can import it, such as the Python site-packages
-folder.
-
-Example Usage
--------------
-
-Start your script by importing the quad tree.
+this evokes a construction from file for pre-built index. The index file will be read into memory.
 
 ::
 
-    from pyqtree import Index
+    tree = Index(disk = file_path)
 
-Setup the spatial index, giving it a bounding box area to keep track of.
-The bounding box being in a four-tuple: (xmin, ymin, xmax, ymax).
-
-::
-
-    spindex = Index(bbox=(0, 0, 100, 100))
-
-Populate the index with items that you want to be retrieved at a later
-point, along with each item's geographic bbox.
+This evokes a construction where only the file path is stored. This allows only file based search. 
 
 ::
+	tree = Index(bbox=(0, 0, x_y_dim, x_y_dim))
 
-    # this example assumes you have a list of items with bbox attribute
-    for item in items:
-        spindex.insert(item, item.bbox)
-
-Then when you have a region of interest and you wish to retrieve items
-from that region, just use the index's intersect method. This quickly
-gives you a list of the stored items whose bboxes intersects your region
-of interests.
+This evokes a construction of an empty quad tree with the given dimensions.
 
 ::
+	tree.insert((startIndex, endIndex, dataOffset, Datasize, fileID), bbox)
 
-    overlapbbox = (51, 51, 86, 86)
-    matches = spindex.intersect(overlapbbox)
+This inserts an item into the tree WHILE IT IS IN MEMORY. Note that currently it only supports the above item format, which is 5 indexes. In the future, full support is possible.
 
-There are other things that can be done as well, but that's it for the
-main usage!
+::
+	tree.to_disk(file_path)
 
-More Information:
------------------
+The to_disk method takes a file name, and writes the data into that file. After this operation, the data in the tree will be cleaned (releasing memory hopefully).
 
--  `Home Page <http://github.com/karimbahgat/Pyqtree>`__
--  `API Documentation <https://karimbahgat.github.io/Pyqtree/>`__
+::
+	matches = tree.intersect(bbox, in_memory = True, debug = True)
 
-License:
---------
-
-This code is free to share, use, reuse, and modify according to the MIT
-license, see LICENSE.txt.
-
-Credits:
---------
-
--  Karim Bahgat
--  Joschua Gandert
-
-Changes
--------
-
-1.0.0 (2018-09-14)
-~~~~~~~~~~~~~~~~~~
-
--  Bump to first major version
--  Fix so returns list instead of set
--  Support inserting hashable items
-
-0.25.0 (2016-06-22)
-~~~~~~~~~~~~~~~~~~~
-
--  Misc user contributions and bug fixes
-
-0.24.0 (2015-06-18)
-~~~~~~~~~~~~~~~~~~~
-
--  Previous stable PyPI version.
+The in_memory = True will evoke the in_memory seach (make sure things are still in memory before calling this method), in_memory = False will evoke a file based search, which only works when the quad tree is linked to a pre-constructed index (see the second type of construction). debug = true enables the search output result to include the bounding boxed of each item. When set to false, it only outputs the items that fall in the search range.

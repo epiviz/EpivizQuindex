@@ -323,8 +323,10 @@ class Index(_QuadTree):
         - **max_depth** (optional): The maximum levels of nested subquads, after which no more splitting
             occurs and the bottommost quad nodes may grow indefinately. Default is 20.
         """
-        if disk:
+        if disk and first_run:
             self.from_disk(disk)
+        elif disk:
+            self.disk = disk
         elif bbox is not None:
             
             x1, y1, x2, y2 = bbox
