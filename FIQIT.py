@@ -5,6 +5,7 @@ from shapely.geometry import Polygon
 
 MAX_ITEMS = 256
 MAX_DEPTH = 20
+# size of each item
 item_size = 72
 # leaf_size = 48 + 1 + ((Item_numbers) * item_size)
 # parent_size = 48 + 1 + 32 + ((Item_numbers) * item_size)
@@ -104,36 +105,12 @@ class _QuadTree(object):
                 node = _QuadNode(item, rect)
                 self.nodes.append(node)
 
-    def _remove(self, item, bbox):
-        rect = _normalize_rect(bbox)
-        if len(self.children) == 0:
-            node = _QuadNode(item, rect)
-            self.nodes.remove(node)
-        else:
-            self._remove_from_children(item, rect)
-
     def box_intersect(self, box1, box2):
         p1 = Polygon([(box1[0], box1[1]), (box1[0], box1[3]), (box1[2], box1[3]), (box1[2], box1[1])])
         p2 = Polygon([(box2[0], box2[1]), (box2[0], box2[3]), (box2[2], box2[3]), (box2[2], box2[1])])
 
         return p1.intersects(p2)
 
-    def quadron_polygon(self):
-        # calculate left-x, right-x, top-y, bottom-y coordinate of the current
-        # node
-        x = self.center[0]
-        y = self.center[1]
-        lx = x - self.width/2
-        rx = x + self.width/2
-        ty = y + self.height/2
-        by = y - self.height/2
-        # create polygon object of the 4 quadron
-        q1 = Polygon([(lx, y), (lx, ty), (x, ty), (x, y)])
-        q2 = Polygon([(x, y), (x, ty), (rx, ty), (rx, y)])
-        q3 = Polygon([(lx, by), (lx, y), (x, y), (x, by)])
-        q4 = Polygon([(x, by), (x, y), (rx, y), (rx, by)])
-
-        return (q1, q2, q3, q4)
 
     def _intersect_memory(self, rect, results = None, debug = False):
         if results is None:
@@ -275,7 +252,6 @@ class _QuadTree(object):
                 node = _QuadNode(node_item, node_rect)
                 self.nodes.append(node)
 
-
         # parse the children outside so that no multiple file pointers opened 
         self.children = []
         for child in children:
@@ -288,40 +264,30 @@ class _QuadTree(object):
 
 class Index(_QuadTree):
     """
-    The top spatial index to be created by the user. Once created it can be
-    populated with geographically placed members that can later be tested for
-    intersection with a user inputted geographic bounding box. Note that the
-    index can be iterated through in a for-statement, which loops through all
-    all the quad instances and lets you access their properties.
-    Example usage:
-    >>> spindex = Index(bbox=(0, 0, 100, 100))
-    >>> spindex.insert('duck', (50, 30, 53, 60))
-    >>> spindex.insert('cookie', (10, 20, 15, 25))
-    >>> spindex.insert('python', (40, 50, 95, 90))
-    >>> results = spindex.intersect((51, 51, 86, 86))
-    >>> sorted(results)
-    ['duck', 'python']
+    The wrapper of the root quad tree node, which represents a spatial index. 
     """
 
-    # def __init__(self, bbox=None, x=None, y=None, width=None, height=None, max_items=MAX_ITEMS, max_depth=MAX_DEPTH):
     def __init__(self, bbox=None, x=None, y=None, width=None, height=None, max_items=MAX_ITEMS, max_depth=MAX_DEPTH, disk = None, first_run=False):
         """
-        Initiate by specifying either 1) a bbox to keep track of, or 2) with an xy centerpoint and a width and height.
+        Initiate by specifying either 1) a bbox to keep track of, or 2) with an xy centerpoint and a width and height,
+        3, a disk path to pre-computed index.
         Parameters:
-        - **bbox**: The coordinate system bounding box of the area that the quadtree should
+        - **bbox** (optional): The coordinate system bounding box of the area that the quadtree should
             keep track of, as a 4-length sequence (xmin,ymin,xmax,ymax)
-        - **x**:
+        - **x** (optional):
             The x center coordinate of the area that the quadtree should keep track of.
-        - **y**
+        - **y** (optional):
             The y center coordinate of the area that the quadtree should keep track of.
-        - **width**:
+        - **width** (optional):
             How far from the xcenter that the quadtree should look when keeping track.
-        - **height**:
+        - **height** (optional):
             How far from the ycenter that the quadtree should look when keeping track
         - **max_items** (optional): The maximum number of items allowed per quad before splitting
             up into four new subquads. Default is 10.
         - **max_depth** (optional): The maximum levels of nested subquads, after which no more splitting
             occurs and the bottommost quad nodes may grow indefinately. Default is 20.
+        - **disk** (optional): The path to which this index is prestored.
+        - **first_run** (optional): Setting it to true evokes a reconstruction from a precomputed file to memory when the object is created. 
         """
         if disk and first_run:
             self.from_disk(disk)
@@ -351,22 +317,14 @@ class Index(_QuadTree):
         """
         self._insert(item, bbox)
 
-    def remove(self, item, bbox):
-        """
-        Removes an item from the quadtree.
-        Parameters:
-        - **item**: The item to remove from the index
-        - **bbox**: The spatial bounding box tuple of the item, with four members (xmin,ymin,xmax,ymax)
-        Both parameters need to exactly match the parameters provided to the insert method.
-        """
-        self._remove(item, bbox)
-
     def intersect(self, bbox, in_memory = False, debug = False):
         """
         Intersects an input boundingbox rectangle with all of the items
         contained in the quadtree.
         Parameters:
         - **bbox**: A spatial bounding box tuple with four members (xmin,ymin,xmax,ymax)
+        - **in_memory** (optional): A flag for using in_memory search with respect to file based search.
+        - **debug** (optional): A flag that allows extra output when debugging.
         Returns:
         - A list of inserted items whose bounding boxes intersect with the input bbox.
         """
@@ -377,6 +335,12 @@ class Index(_QuadTree):
 
 
     def from_disk(self, f_path):
+        '''
+        Constructs a quadtree index from a precomputed file and store it in the current node.
+        Parameters:
+        - ***f_path***: a string containing the path to the precomputed index.
+
+        '''
         header = None
         self.nodes = []
         with open(f_path, 'rb') as f:
@@ -390,6 +354,12 @@ class Index(_QuadTree):
         self._from_disk(f_path, 64)
 
     def to_disk(self, path):
+        '''
+        Converts a quadtree index to file format and output it to disk.
+        Parameter:
+        - ***path***: a string that contains the path to which the tree will be stored at.
+    
+        '''
         # defualt filepointer.tell() probably will not work as python reads bytes into 
         # buffer (maybe it works). To keep things undercontrol, we use a manual byte counter.
         q = [self]

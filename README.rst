@@ -1,4 +1,4 @@
-Pyqtree
+FIQIT
 =======
 
 usage
