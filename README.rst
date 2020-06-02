@@ -3,7 +3,7 @@ FIQIT
 
 usage
 
-1. Initializes an empty QuadTree Index
+1. Initialize an empty QuadTree Index
 
 ::
 
@@ -14,10 +14,10 @@ the BigWig file to create the index.
 
 ::
 
-    tree.add_to_index(file=<LINK TO BNIGWIG FILE>, zoomlvl = -2)
+    tree.add_to_index(file=<LOCATION OF BIGWIG FILE>, zoomlvl = -2)
 
 
-3. The index is usually built in memory. One can also write the index to disk 
+3. The index is built in memory but can also be written to disk.
 
 ::
 
