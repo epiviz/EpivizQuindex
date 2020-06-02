@@ -1,8 +1,0 @@
-/htmlcov
-/__pycache__
-/.cache
-
-*.pyc
-*.lock
-*.dirlock
-*/.DS_Store

@@ -1,4 +1,6 @@
-#PYTHON VERSION CHECK
+## heavily modefied quadtree implementation from
+## https://github.com/karimbahgat/Pyqtree
+
 import sys
 from struct import *
 from shapely.geometry import Polygon
@@ -22,14 +24,12 @@ def _normalize_rect(rect):
         y1, y2 = y2, y1
     return (x1, y1, x2, y2)
 
-
 def _loopallchildren(parent):
     for child in parent.children:
         if child.children:
             for subchild in _loopallchildren(child):
                 yield subchild
         yield child
-
 
 class _QuadNode(object):
     def __init__(self, item, rect):
@@ -41,7 +41,6 @@ class _QuadNode(object):
 
     def __hash__(self):
         return hash(self.item)
-
 
 class _QuadTree(object):
     """
@@ -110,7 +109,6 @@ class _QuadTree(object):
         p2 = Polygon([(box2[0], box2[1]), (box2[0], box2[3]), (box2[2], box2[3]), (box2[2], box2[1])])
 
         return p1.intersects(p2)
-
 
     def _intersect_memory(self, rect, results = None, debug = False):
         if results is None:
@@ -199,7 +197,7 @@ class _QuadTree(object):
         self.nodes = []
         for node in nodes:
             # self._insert_into_children(node.item, node.rect)
-            # call insert again, which would evoke insert into 
+            # call insert again, which would invoke insert into 
             # children if appropriate
             self._insert(node.item, node.rect)
 
@@ -260,8 +258,6 @@ class _QuadTree(object):
             else:
                 self.children.append(None)
 
-
-
 class Index(_QuadTree):
     """
     The wrapper of the root quad tree node, which represents a spatial index. 
@@ -287,7 +283,7 @@ class Index(_QuadTree):
         - **max_depth** (optional): The maximum levels of nested subquads, after which no more splitting
             occurs and the bottommost quad nodes may grow indefinately. Default is 20.
         - **disk** (optional): The path to which this index is prestored.
-        - **first_run** (optional): Setting it to true evokes a reconstruction from a precomputed file to memory when the object is created. 
+        - **first_run** (optional): Setting it to true invokes a reconstruction from a precomputed file to memory when the object is created. 
         """
         if disk and first_run:
             self.from_disk(disk)
@@ -332,7 +328,6 @@ class Index(_QuadTree):
             return self._intersect_memory(bbox, debug = debug)
         else:
             return self._intersect_file(bbox, self.disk, 64, debug = debug)
-
 
     def from_disk(self, f_path):
         '''
