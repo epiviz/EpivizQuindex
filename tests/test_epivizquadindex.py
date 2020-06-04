@@ -1,4 +1,4 @@
-from epivizquadindex import __version__
+from EpivizQuindex import __version__
 
 
 def test_version():

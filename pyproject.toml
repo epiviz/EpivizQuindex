@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "EpivizQuadIndex"
+name = "EpivizQuindex"
 version = "0.1.0"
-description = ""
+description = "Quad tree based index for genomic search across large collections of files (BigWig's or BigBed's)"
 authors = ["Jayaram Kancherla <jayaram.kancherla@gmail.com>"]
 
 [tool.poetry.dependencies]

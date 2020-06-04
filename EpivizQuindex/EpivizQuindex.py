@@ -9,7 +9,7 @@ import pandas
 from epivizfileserver.parser import BigWig
 import struct
 
-Class EpivizQuadIndex(object):
+class EpivizQuindex(object):
 
     def __init__(self, genome, max_depth=20, max_items=256, base_path = os.getcwd()):
         self.item_size = 72

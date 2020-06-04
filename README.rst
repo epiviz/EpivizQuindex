@@ -7,7 +7,7 @@ usage
 
 ::
 
-    tree = EpivizQuadIndex()
+    tree = EpivizQuindex()
 
 2. Add files to the index. by default the library uses the unbinned (raw) data from 
 the BigWig file to create the index. 
