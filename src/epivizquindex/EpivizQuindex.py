@@ -9,6 +9,10 @@ import pandas
 from epivizfileserver.parser import BigWig
 import struct
 
+__author__ = "Jayaram Kancherla"
+__copyright__ = "Jayaram Kancherla"
+__license__ = "mit"
+
 class EpivizQuindex(object):
 
     def __init__(self, genome, max_depth=20, max_items=256, base_path = os.getcwd()):

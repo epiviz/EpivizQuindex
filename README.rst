@@ -1,9 +1,12 @@
-FIQIT
-=======
+=============
+EpivizQuindex
+=============
 
-usage
 
-1. Initialize an empty QuadTree Index
+Usage
+=====
+
+1. Initialize an EpivizQuindex object
 
 ::
 
@@ -25,3 +28,9 @@ the BigWig file to create the index.
 
 This allows persistence storage of the index and reusability. The package also supports 
 querying quadindex on disk without loading the entire index into memory.
+
+Note
+====
+
+This project has been set up using PyScaffold 3.2.3. For details and usage
+information on PyScaffold see https://pyscaffold.org/.
