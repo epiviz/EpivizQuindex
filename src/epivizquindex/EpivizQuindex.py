@@ -130,3 +130,21 @@ class EpivizQuindex(object):
         result["chr"] = chr
 
         return result
+
+
+# This is aiming for a generic index that can be used for generally all
+# indices
+
+# then we probabily need another format storing how item is stored
+
+class genericIndex(object):
+    """docstring for genericIndex"""
+    def __init__(self, max_depth=20, max_items=256, base_path = os.getcwd()):
+        # self.item_size = 72
+        # self.file_mapping = {}
+        # self.file_objects = {}
+        # self.file_chrids = {}
+        self.max_items = max_items
+        self.max_depth = max_depth
+        self.base_path = base_path
+        # self.file_counter = 0

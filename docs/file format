@@ -1,0 +1,39 @@
+file format
+Header:
+magic 0x45504951
+max item
+tree offest
+what is this integer i dont know
+x1
+y1
+x2
+y2 these are the four coordinates of the whole bounding box
+0 reserved
+64 bytes total
+
+leaf node spec:
+x1,
+y1, these are the center of the bounding box of this leaf
+width,
+height, this is the size of this bounding box
+_depth, this is the depth of this leaf
+nodes, number of items (or nodes) in this leaf
+isLeaf, boolean indicating whether this is leaf node, which should be 1
+8 bytes other than the boolean + 1 for the boolean, total of 49 bytes
+items, total space is nodes * itemSize
+
+parent node spec:
+x1,
+y1, these are the center of the bounding box of this leaf
+width,
+height, this is the size of this bounding box
+_depth, this is the depth of this leaf
+nodes, number of items (or nodes) in this leaf
+isLeaf, boolean indicating whether this is leaf node, which should be 1
+children positions, this consists 4 longs specifying file position of the children
+8 bytes other than the boolean + 1 for the boolean + 32 for children positions, total of 81 bytes
+items, total space is nodes * itemSize
+
+itemSize
+content, this is specified by the user
+bounding box, this is bottom left, top right coordinate of the bounding box of this item

@@ -138,8 +138,8 @@ class _QuadTree(object):
             results = []
         if offset is -1:
             return results
-        if offset is None:
-            raise Exception("memory search not implemented")
+        # if offset is None:
+        #     raise Exception("memory search not implemented")
         with open(f_path, 'rb') as f:
             f.seek(offset)
             a = f.read(48 + 1)
@@ -229,7 +229,6 @@ class _QuadTree(object):
         for node in self.nodes:
             (item, rect) = (node.item, node.rect)
             barray += pack("llllldddd", item[0], item[1], item[2], item[3], item[4], rect[0], rect[1], rect[2], rect[3])
-        (x, y, width, height, depth, num_items, isLeaf) = unpack("ddddll?", barray[0:49])
         return barray, children, position
 
     def _from_disk(self, f_path, offset):
