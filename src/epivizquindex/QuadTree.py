@@ -79,7 +79,7 @@ class _QuadTree(object):
             self.nodes.append(node)
 
             if len(self.nodes) > self.max_items and self._depth < self.max_depth:
-                self.isLeaf == False 
+                self.isLeaf = False 
                 self._split()
         else:
             # calculate left-x, right-x, top-y, bottom-y coordinate of the current
