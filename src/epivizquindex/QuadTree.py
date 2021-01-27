@@ -236,8 +236,9 @@ class _QuadTree(object):
         self.center = (0,0)
         with open(f_path, 'rb') as f:
             f.seek(offset)
-            
-            (x, y, self.width, self.height, self._depth, num_node, self.isLeaf) = unpack("ddddll?", f.read(49))
+            a = f.read(49)
+            # print(offset, a)
+            (x, y, self.width, self.height, self._depth, num_node, self.isLeaf) = unpack("ddddll?", a)
             self.center= (x, y)
             if not self.isLeaf:
                 children = unpack("llll", f.read(32))
