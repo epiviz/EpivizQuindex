@@ -214,7 +214,7 @@ class EpivizQuindex(object):
         with open(self.base_path + "quadtreeFileMaps.index", 'wb') as pickle_file:
             pickle.dump(self.file_mapping, pickle_file)
 
-    def from_disk(self):
+    def from_disk(self, load = True):
         with open(self.base_path + "quadtreeKeys.index", 'rb') as pickle_file:
             keys = pickle.load(pickle_file)
         with open(self.base_path + "quadtreeFileMaps.index", 'rb') as pickle_file:
@@ -223,8 +223,8 @@ class EpivizQuindex(object):
             path = self.base_path + "quadtree." + chrm + ".index"
             # this check might not be necessary
             if os.path.exists(path):
-                # print(path)
-                self.trees[chrm] = Index(disk = path, first_run = True)
+                # print(path, load)
+                self.trees[chrm] = Index(disk = path, first_run = load)
 
     def fetch_entries(self, fileid, df, chrm, start, end, zoomlvl):
         df_search = df[df["fileid"] == fileid]
@@ -254,10 +254,10 @@ class EpivizQuindex(object):
         # print("hlevel", hlevel)
         x_y_dim = math.ceil(math.pow(2, hlevel))
         # print("max x|y =", x_y_dim)
-        if in_memory:
-            tree = self.trees[chrm]
-        else:
-            tree = Index(bbox=(0, 0, x_y_dim, x_y_dim), disk = self.base_path + "quadtree." + chrm + ".index", first_run = True)
+        # if in_memory:
+        tree = self.trees[chrm]
+        # else:
+        #     tree = Index(bbox=(0, 0, x_y_dim, x_y_dim), disk = self.base_path + "quadtree." + chrm + ".index", first_run = True)
 
         xstart, ystart, _ = hcoords(start, chromLength)
         xend, yend, _ = hcoords(end, chromLength)
@@ -266,7 +266,6 @@ class EpivizQuindex(object):
         matches = tree.intersect(overlapbbox, in_memory = in_memory)
 
         df = pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid"])
-
         if file:
             fileid = self.file_mapping.index(file)
             return self.fetch_entries(fileid, df, chrm, start, end, zoomlvl)

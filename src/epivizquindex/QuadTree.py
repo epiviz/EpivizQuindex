@@ -285,6 +285,7 @@ class Index(_QuadTree):
         - **disk** (optional): The path to which this index is prestored.
         - **first_run** (optional): Setting it to true invokes a reconstruction from a precomputed file to memory when the object is created. 
         """
+        # print(disk, first_run)
         if disk and first_run:
             self.from_disk(disk)
         elif disk:
