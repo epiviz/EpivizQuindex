@@ -111,7 +111,7 @@ class _QuadTree(object):
         return p1.intersects(p2)
 
     def _intersect_memory(self, rect, results = None, debug = False):
-        if results is None:
+        if results == None:
             results = []
 
         if not self.isLeaf:
@@ -134,9 +134,9 @@ class _QuadTree(object):
         return results
 
     def _intersect_file(self, rect, f_path, offset = None, results=None, debug = False):
-        if results is None:
+        if results == None:
             results = []
-        if offset is -1:
+        if offset == -1:
             return results
         # if offset is None:
         #     raise Exception("memory search not implemented")
@@ -205,16 +205,16 @@ class _QuadTree(object):
         # return a pack of bites and children objects if exist
         barray = pack('ddddl', self.center[0], self.center[1], self.width, self.height, self._depth)
         barray += pack('l', len(self.nodes))
-        if len(self.children) is not 0:
+        if len(self.children) != 0:
             # parent node
             barray += pack('?', 0)
             children = self.children
             children_position = []
             for c in self.children:
                 children_position.append(position)
-                if len(c.children) is not 0:
+                if len(c.children) != 0:
                     position += 48 + 1 + 32 + (len(c.nodes) * item_size)
-                elif len(c.nodes) is not 0:
+                elif len(c.nodes) != 0:
                     position += 48 + 1 + ((len(c.nodes)) * item_size)
                 else: 
                     children_position[-1] = -1
@@ -253,7 +253,7 @@ class _QuadTree(object):
         # parse the children outside so that no multiple file pointers opened 
         self.children = []
         for child in children:
-            if child is not -1:
+            if child != -1:
                 self.children.append(_QuadTree(path = f_path, offset = child))
             else:
                 self.children.append(None)
@@ -290,7 +290,7 @@ class Index(_QuadTree):
             self.from_disk(disk)
         elif disk:
             self.disk = disk
-        elif bbox is not None:
+        elif bbox != None:
             
             x1, y1, x2, y2 = bbox
             self.bbox = bbox

@@ -18,7 +18,7 @@ def hcoords(x, chromLength, dims = 2):
     hlevel = math.ceil(math.log2(chromLength)/dims)
     # print("hlevel, ", hlevel)
     hilbert_curve = HilbertCurve(hlevel, dims)
-    [x,y] = hilbert_curve.coordinates_from_distance(x)
+    [x,y] = hilbert_curve.points_from_distances([x])[0]
     return x, y, hlevel
 
 # query : dictionary with 2 items, start and end
@@ -33,13 +33,13 @@ def range2bbox(hlevel, query, dims = 2, margin = 0):
     # ite = 0
     start = query["start"]+1
     points = []
-    if start%4 is 1:
+    if start%4 == 1:
         points.append(start)
         start += 1
-    if start%4 is 2:
+    if start%4 == 2:
         points.append(start)
         start += 1
-    if start%4 is 3: 
+    if start%4 == 3: 
         points.append(start)
         start += 1 
     points.append(start)
@@ -74,8 +74,9 @@ def range2bbox(hlevel, query, dims = 2, margin = 0):
     # print(points)
     hillcorX = []
     hillcorY = []
-    for point in points:
-        [x, y] = hilbert_curve.coordinates_from_distance(point)
+    # for point in points:
+    for h_point in hilbert_curve.points_from_distances(points):
+        [x, y] = h_point
         # print(x, y, point)
         hillcorX.append(x)
         hillcorY.append(y)
@@ -86,7 +87,7 @@ def range2bbox(hlevel, query, dims = 2, margin = 0):
 
 class EpivizQuindex(object):
 
-    def __init__(self, genome, max_depth=20, max_items=256, base_path = os.getcwd()):
+    def __init__(self, genome, max_depth=20, max_items=256, base_path = os.path.join(os.getcwd(), 'quIndex/')):
         self.item_size = 72
         self.file_mapping = []
         self.file_objects = {}
@@ -97,6 +98,8 @@ class EpivizQuindex(object):
         self.base_path = base_path
         self.file_counter = 0
         self.trees = {}
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
 
 
     def get_file_btree(self, file, zoomlvl):
@@ -208,19 +211,19 @@ class EpivizQuindex(object):
     def to_disk(self):
         for chrm in self.trees.keys():
             if self.trees.get(chrm) != None:
-                self.trees[chrm].to_disk(self.base_path + "quadtree." + chrm + ".index")
-        with open(self.base_path + "quadtreeKeys.index", 'wb') as pickle_file:
+                self.trees[chrm].to_disk(os.path.join(self.base_path,  "quadtree."+ chrm + ".index"))
+        with open(os.path.join(self.base_path, "quadtreeKeys.index"), 'wb') as pickle_file:
             pickle.dump(list(self.trees.keys()), pickle_file)
-        with open(self.base_path + "quadtreeFileMaps.index", 'wb') as pickle_file:
+        with open(os.path.join(self.base_path,  "quadtreeFileMaps.index"), 'wb') as pickle_file:
             pickle.dump(self.file_mapping, pickle_file)
 
     def from_disk(self, load = True):
-        with open(self.base_path + "quadtreeKeys.index", 'rb') as pickle_file:
+        with open(os.path.join(self.base_path, "quadtreeKeys.index"), 'rb') as pickle_file:
             keys = pickle.load(pickle_file)
-        with open(self.base_path + "quadtreeFileMaps.index", 'rb') as pickle_file:
+        with open(os.path.join(self.base_path,  "quadtreeFileMaps.index"), 'rb') as pickle_file:
             self.file_mapping = pickle.load(pickle_file)
         for chrm in keys:
-            path = self.base_path + "quadtree." + chrm + ".index"
+            path = os.path.join(self.base_path,  "quadtree."+ chrm + ".index")
             # this check might not be necessary
             if os.path.exists(path):
                 # print(path, load)
@@ -229,7 +232,7 @@ class EpivizQuindex(object):
     def fetch_entries(self, fileid, df, chrm, start, end, zoomlvl):
         df_search = df[df["fileid"] == fileid]
         file = self.file_mapping[fileid]
-        if self.file_objects.get(file) is not None:
+        if self.file_objects.get(file) != None:
             bw = self.file_objects[file]
         else:
             bw = BigWig(file)

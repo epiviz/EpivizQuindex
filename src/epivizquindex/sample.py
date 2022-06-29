@@ -31,7 +31,7 @@ genome = {
 
 index = EpivizQuindex.EpivizQuindex(genome)
 f1 = "../testData/39033.bigwig"
-f2 = "../testData/39031.bigwig"
+f2 = "../testData/39033.bigwig"
 
 # adding file to index
 index.add_to_index(f1)
