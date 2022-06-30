@@ -13,6 +13,7 @@ __pycache__/*
 .*.swp
 */.ipynb_checkpoints/*
 .DS_Store
+gittemplate
 
 # Project files
 .ropeproject
@@ -48,3 +49,7 @@ MANIFEST
 
 # Per-project virtualenvs
 .venv*/
+
+
+# large test files
+large_test_data/*

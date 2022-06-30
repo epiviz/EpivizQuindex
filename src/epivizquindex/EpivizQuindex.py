@@ -6,8 +6,8 @@ import sys
 import math
 import json
 import pandas
-from epivizfileserver.parser import BigWig
-from epivizfileserver.parser.utils import toDataFrame
+from epivizFileParser import BigWig
+from epivizFileParser.utils import toDataFrame
 import struct
 
 __author__ = "Jayaram Kancherla"
@@ -15,6 +15,19 @@ __copyright__ = "Jayaram Kancherla"
 __license__ = "mit"
 
 def hcoords(x, chromLength, dims = 2):
+    '''
+    Returns hilbert space coordinate of the input query.
+
+            Parameters:
+            - **x (int)**:            A integer representing the query location in a chromosome.
+            - **chromLength (int)**:  The total length of the chromosome.
+            - **dims (int)**:         dimension of the hilbert space, by default we use 2d hilbert space.
+
+            Returns:
+            - **x (int)**:        x coordinate in hilbert space.
+            - **y (int)**:        y coordinate in hilbert space.
+            - **hlevel (int)**:   level of the hilbert space.
+    '''
     hlevel = math.ceil(math.log2(chromLength)/dims)
     # print("hlevel, ", hlevel)
     hilbert_curve = HilbertCurve(hlevel, dims)
@@ -23,6 +36,18 @@ def hcoords(x, chromLength, dims = 2):
 
 # query : dictionary with 2 items, start and end
 def range2bbox(hlevel, query, dims = 2, margin = 0):
+    '''
+    Convert the input query chromosome range to query bounding box in hilbert space.
+
+            Parameters:
+            - **hlevel (int)**:       level of the hilbert space, calculated by the size of the chromosome.
+            - **query (dict)**:       dictionary of a query range, with "start" and "end" representing the query range in a chromosome.
+            - **dims (int)**:         dimension of the hilbert space, by default we use 2d hilbert space.
+            - **margin (int)**:       margin of the query box in hilbert space.
+
+            Returns:
+            - **bbox (tuple)**: 4 integers representing the lower left and top right coordinate. The order is lower left x, y, then top right x, y.
+    '''
     # now = time.time()
     # query = {
     #     "start": 0,
@@ -88,6 +113,18 @@ def range2bbox(hlevel, query, dims = 2, margin = 0):
 class EpivizQuindex(object):
 
     def __init__(self, genome, max_depth=20, max_items=256, base_path = os.path.join(os.getcwd(), 'quIndex/')):
+        '''
+        Initialization of Quindex object.
+
+            Parameters:
+            - **genome (dict)**:     dictionary with size of each chromosome in the genome.
+            - **max_depth (int)**: maximum depth of the Quindex.
+            - **max_items (int)**: maximum number of items in a node before splitting.
+            - **base_path (str)**: path to the index folder. If the index is precomputed, you need to set this path to the folder to load the Quindex.
+
+            Returns:
+                    
+        '''
         self.item_size = 72
         self.file_mapping = []
         self.file_objects = {}
@@ -102,7 +139,18 @@ class EpivizQuindex(object):
             os.mkdir(base_path)
 
 
-    def get_file_btree(self, file, zoomlvl):
+    def get_file_btree(self, file, zoomlvl = -2):
+        '''
+        Return the btree of the bigwig file at the lowest level.
+
+            Parameters:
+            - **file (str)**:       file path .
+            - **zoomlvl (int)**:    zoom level of the btree.
+
+            Returns:
+            - **tree (bytes)**:       btree of the bigwig file in the given zoom level.
+            - **bw (object)**:        bigwig file object.
+        '''
         bw = BigWig(file)
         bw.getHeader()
         bw.zooms = {}
@@ -128,11 +176,36 @@ class EpivizQuindex(object):
         return tree, bw
     
     def read_node(self, tree, offset, endian="="):
+        '''
+        Return the node header of the given offest in the btree
+
+            Parameters:
+            - **tree (bytes)**:     btree from bigwig file.
+            - **offset (int)**:     offest to the node in btree.
+            - **endian (char)**:    endian of the parse file.
+
+            Returns:
+            - **result (dict)**:    header of the node.            
+        '''
         data = tree[offset:offset + 4]
         (rIsLeaf, rReserved, rCount) = struct.unpack(endian + "BBH", data)
         return {"rIsLeaf": rIsLeaf, "rCount": rCount, "rOffset": offset + 4}
 
     def traverse_nodes(self, node, zoomlvl = -2, tree = None, result = [], fullIndexOffset = None, endian="="):
+        '''
+        Recursively traverse and return the value in the btree.
+
+            Parameters:
+            - **node (dict)**:            node header.
+            - **zoomlvl (int)**:          zoomlevel of the node.
+            - **tree (bytes)**:           btree from bigwig file.
+            - **result (list)**:          recursive result array to store the parsed leaf nodes.
+            - **fullIndexOffset (int)**:  full index offset of the bigwig file.
+            - **endian (char)**:          endian of the parse file.
+
+            Returns:
+            - **result (list)**:          recursive result array to store the parsed leaf nodes.        
+        '''
         offset = node.get("rOffset")
         if node.get("rIsLeaf"):
             for i in range(0, node.get("rCount")):
@@ -152,6 +225,17 @@ class EpivizQuindex(object):
         return result
 
     def get_leaf_nodes(self, tree, bw, zoomlvl):
+        '''
+        read the leaf node in the bigwig btree.
+
+            Parameters:
+            - **tree (bytes)**:    btree from bigwig file.
+            - **bw (object)**:     bigwig file object.
+            - **zoomlvl (int)**:   zoomlevel of the node.
+
+            Returns:
+            - **df (DataFrame)**:  Data frame of btree nodes' values.        
+        '''
         findexOffset = bw.header.get("fullIndexOffset")
         offset = 48
         root = self.read_node(tree, offset, endian = bw.endian)
@@ -164,10 +248,28 @@ class EpivizQuindex(object):
         return df
 
     def get_file_chr(self, bw):
+        '''
+        Return the chromosomes in the given bigwig file.
+
+            Parameters:
+            - **bw (object)**:     bigwig file object.
+
+            Returns:
+            - **chrmIds (dict)**:  dictionary mapping of chromosome to IDs in the file.        
+        '''
         bw.getId("chr2")
         return bw.chrmIds
 
     def add_to_index(self, file, zoomlvl = -2):
+        '''
+        Add a file to Quindex.
+
+            Parameters:
+            - **file (str)**:     file path.
+
+            Returns:
+                           
+        '''
         tree, bw = self.get_file_btree(file, zoomlvl)
         df = self.get_leaf_nodes(tree, bw, zoomlvl)
         chrmTree = self.get_file_chr(bw)
@@ -209,6 +311,14 @@ class EpivizQuindex(object):
         self.file_counter += 1
 
     def to_disk(self):
+        '''
+        Save the current index to the path that is stored when creating the Quindex object.
+
+            Parameters:
+
+            Returns:
+       
+        '''
         for chrm in self.trees.keys():
             if self.trees.get(chrm) != None:
                 self.trees[chrm].to_disk(os.path.join(self.base_path,  "quadtree."+ chrm + ".index"))
@@ -218,6 +328,15 @@ class EpivizQuindex(object):
             pickle.dump(self.file_mapping, pickle_file)
 
     def from_disk(self, load = True):
+        '''
+        load the current index to the path that is stored when creating the Quindex object.
+
+            Parameters:
+            - **load (bool)**: a boolean indicating whether the Index backbone is newly created. By default this should be true.
+
+            Returns:
+       
+        '''
         with open(os.path.join(self.base_path, "quadtreeKeys.index"), 'rb') as pickle_file:
             keys = pickle.load(pickle_file)
         with open(os.path.join(self.base_path,  "quadtreeFileMaps.index"), 'rb') as pickle_file:
@@ -230,6 +349,21 @@ class EpivizQuindex(object):
                 self.trees[chrm] = Index(disk = path, first_run = load)
 
     def fetch_entries(self, fileid, df, chrm, start, end, zoomlvl):
+        '''
+        Fetch entries from a file.
+
+            Parameters:
+            - **fileid (int)**: id of the file stored in Quindex.
+            - **df (DataFrame)**: Data Frame contains results from Quindex query.
+            - **chrm (str)**: target chromosome.
+            - **start (int)**: start location of the query range.
+            - **end (int)**: end location of the query range.
+            - **zoomlvl (int)**: zoom lvl of the query range.
+
+            Returns:
+                result (Data Frame): Data Frame containing the fetched entries sorte by start location.
+       
+        '''
         df_search = df[df["fileid"] == fileid]
         file = self.file_mapping[fileid]
         if self.file_objects.get(file) != None:
@@ -251,6 +385,20 @@ class EpivizQuindex(object):
         return result.sort_values(by = ['start'])
 
     def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file = None):
+        '''
+        Query the given range in the Quindex.
+
+            Parameters:
+            - **chrm (str)**: target chromosome.
+            - **start (int)**: start location of the query range.
+            - **end (int)**: end location of the query range.
+            - **zoomlvl (int)**: zoom lvl of the query range.
+            - **in_memory (bool)**: Boolean indicating whether the search in performed in memory.
+            - **file (string)**: path to the file. If this is provided, the query will only return searches related to this file.
+
+            Returns:
+                result (Data Frame): Data Frame containing the fetched entries sorte by start location.
+       '''
         chromLength = self.genome[chrm]
         dims = 2
         hlevel = math.ceil(math.log2(chromLength)/dims)

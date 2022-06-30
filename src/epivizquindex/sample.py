@@ -28,10 +28,11 @@ genome = {
     "chrX": 155270560, 
     "chrY": 59373566
 }
+base_path='../../large_test_data/'
 
-index = EpivizQuindex.EpivizQuindex(genome)
-f1 = "../testData/39033.bigwig"
-f2 = "../testData/39033.bigwig"
+index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
+f1 = "../../large_test_data/39033.bigwig"
+f2 = "../../large_test_data/39033.bigwig"
 
 # adding file to index
 index.add_to_index(f1)
@@ -40,12 +41,11 @@ index.add_to_index(f2)
 # storing the precomputed index to cwd
 index.to_disk()
 
-# reading a precomputed set of indecies from cwq
-index = EpivizQuindex.EpivizQuindex(genome)
+# reading a precomputed set of indecies
+index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
 index.from_disk()
 
 # querying a range in 1 file
-f1 = "../testData/39033.bigwig"
 print(index.query("chr2", 0, 900000, file = f1))
 
 # querying for a range in all files
@@ -57,13 +57,12 @@ print(index.query("chr2", 0, 900000))
 # note that using load = False, EpvizQuindex does not 
 # read the index into memory.
 memory = False
-index = EpivizQuindex.EpivizQuindex(genome)
+index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
 index.from_disk(load = memory)
 
 
 # querying a range in 1 file without loading it to memory
 # here, the in_memory parameter must be set to false
-f1 = "../testData/39033.bigwig"
 print(index.query("chr2", 0, 900000, file = f1, in_memory = memory))
 
 # querying for a range in all files without loading it to memory

@@ -13,6 +13,15 @@ item_size = 72
 # parent_size = 48 + 1 + 32 + ((Item_numbers) * item_size)
 
 def _normalize_rect(rect):
+    '''
+    Fix the format of the query rectangular box to lower left x, y and top right x, y.
+
+        Parameters:
+        - **rect (array)**: Array of coordinates.
+
+        Returns:
+        - **coordinates (x1, y1, x2, y2) **: lower left x, y and top right x, y coordinates.
+    '''
     if len(rect) == 2:
         x1, y1 = rect
         x2, y2 = rect
@@ -25,6 +34,12 @@ def _normalize_rect(rect):
     return (x1, y1, x2, y2)
 
 def _loopallchildren(parent):
+    '''
+    helper method to loop the children.
+
+        Parameters:
+        - **parent (_Quadtree)**: _Quadtree node object
+    '''
     for child in parent.children:
         if child.children:
             for subchild in _loopallchildren(child):
@@ -32,6 +47,12 @@ def _loopallchildren(parent):
         yield child
 
 class _QuadNode(object):
+    '''
+    Quadtree node object that contains the data and the rectangular bounding box..
+
+        Parameters:
+        - **parent (_Quadtree)**: _Quadtree node object
+    '''
     def __init__(self, item, rect):
         self.item = item
         self.rect = rect
@@ -51,6 +72,22 @@ class _QuadTree(object):
     """
 
     def __init__(self, x = None, y = None, width = None, height = None, max_items = None, max_depth = None, _depth=0 , path = None, offset = None):
+        '''
+        Initialize the current node.
+
+            Parameters:
+            - **x (int)**: x coordinate of the center of the node's bounding box.
+            - **y (int)**: y coordinate of the center of the node's bounding box.
+            - **width (int)**: width of the the node's bounding box.
+            - **height (int)**: height of the node's bounding box.
+            - **max_items (int)**: maximum number of items in a node before splitting.
+            - **max_depth (int)**: maximum depth of the index. the index will stop splitting after reaching max depth.
+            - **_depth (int)**: depth of the current node.
+            - **path (str)**: path to the precomputed index. If None, node will be computed in memory.
+            - **offset (int)**: file offset to the node. 
+
+       
+        '''
         self.nodes = []
         self.children = []
         self.isLeaf = True
@@ -67,12 +104,40 @@ class _QuadTree(object):
             yield child
 
     def IsParent(self):
+        '''
+        Helper method to determin whether the node is a parent node..
+
+            Parameters:
+
+            Returns:
+            -**IsParent (bool)**: Whether the node is a parent node.
+       
+        '''
         return len(self.children) == 0
 
     def hasData(self):
+        '''
+        Helper method to determin whether the node contains data.
+
+            Parameters:
+
+            Returns:
+            - **hasData (bool)**: Whether the node contains data.
+       
+        '''
         return len(self.nodes) != 0
 
     def _insert(self, item, bbox):
+        '''
+        Insert the item into the index.
+
+            Parameters:
+            - **item**: data to be inserted.
+            - **bbox (tuple)**: bounding box of the item.
+
+            Returns:
+       
+        '''
         rect = _normalize_rect(bbox)
         if len(self.children) == 0:
             node = _QuadNode(item, rect)
@@ -105,12 +170,34 @@ class _QuadTree(object):
                 self.nodes.append(node)
 
     def box_intersect(self, box1, box2):
+        '''
+        Determin whether the two bounding box intersect.
+
+            Parameters:
+            - **box1 (tuple)**: bottom left, top right coordinate of a bounding box.
+            - **box2 (tuple)**: bottom left, top right coordinate of a bounding box.
+
+            Returns:
+            - **box_intersect (bool)**: Whether the two bounding box intersect.
+       
+        '''
         p1 = Polygon([(box1[0], box1[1]), (box1[0], box1[3]), (box1[2], box1[3]), (box1[2], box1[1])])
         p2 = Polygon([(box2[0], box2[1]), (box2[0], box2[3]), (box2[2], box2[3]), (box2[2], box2[1])])
 
         return p1.intersects(p2)
 
     def _intersect_memory(self, rect, results = None, debug = False):
+        '''
+        Recursively return nodes that intersect with the bounding box in memory. This method requires the index preloaded in memory.
+
+            Parameters:
+            - **rect (tuple)**: a tuple that represents the bottom left, top right coorinates of a bounding box.
+            - **results (list)**:   recursive result array to store the parsed leaf nodes.     
+            - **debug (bool)**: When true, the results also include the bounding box of each entry. 
+            Returns:
+            - **results (list)**:   recursive result array to store the parsed leaf nodes.    
+       
+        '''
         if results == None:
             results = []
 
@@ -134,6 +221,19 @@ class _QuadTree(object):
         return results
 
     def _intersect_file(self, rect, f_path, offset = None, results=None, debug = False):
+        '''
+        Recursively return nodes that intersect with the bounding box in the index located in a file.
+
+            Parameters:
+            - **rect (tuple)**: a tuple that represents the bottom left, top right coorinates of a bounding box.
+            - **f_path (str)**: path to the index.
+            - **offset (int)**: byte offset to the node.
+            - **results (list)**:   recursive result array to store the parsed leaf nodes.     
+            - **debug (bool)**: When true, the results also include the bounding box of each entry. 
+            Returns:
+            - **results (list)**:   recursive result array to store the parsed leaf nodes.    
+       
+        '''
         if results == None:
             results = []
         if offset == -1:
@@ -176,6 +276,14 @@ class _QuadTree(object):
         return results
 
     def _split(self):
+        '''
+        convert the current node into a parent node, spawn 4 child nodes and insert the current node's data into children.
+
+            Parameters:
+
+            Returns:
+       
+        '''
         quartwidth = self.width / 4.0
         quartheight = self.height / 4.0
         halfwidth = self.width / 2.0
@@ -202,7 +310,18 @@ class _QuadTree(object):
             self._insert(node.item, node.rect)
 
     def _to_disk(self, position):
-        # return a pack of bites and children objects if exist
+        '''
+        pack the current node into binary, and prepare the children node if there is any.
+
+            Parameters:
+            - **position (int)**: position to the offest in the file, this is to compute the file offest for the children nodes.
+
+            Returns:
+            - **barray (bytes)**: bytes of the current node.
+            - **children (_QuadTree)**: children node objects if any.
+            - **position (int)**: byte position to the current end of file after adding the current node.
+       
+        '''
         barray = pack('ddddl', self.center[0], self.center[1], self.width, self.height, self._depth)
         barray += pack('l', len(self.nodes))
         if len(self.children) != 0:
@@ -232,6 +351,16 @@ class _QuadTree(object):
         return barray, children, position
 
     def _from_disk(self, f_path, offset):
+        '''
+        load a node from file.
+
+            Parameters:
+            - **f_path (str)**: path to the pre-computed index.
+            - **offset (int)**: position to the offest in the file. This offset contains the location of the node
+
+            Returns:
+       
+        '''
         children = []
         self.center = (0,0)
         with open(f_path, 'rb') as f:
@@ -334,7 +463,7 @@ class Index(_QuadTree):
         '''
         Constructs a quadtree index from a precomputed file and store it in the current node.
         Parameters:
-        - ***f_path***: a string containing the path to the precomputed index.
+        - **f_path**: a string containing the path to the precomputed index.
 
         '''
         header = None
@@ -353,7 +482,7 @@ class Index(_QuadTree):
         '''
         Converts a quadtree index to file format and output it to disk.
         Parameter:
-        - ***path***: a string that contains the path to which the tree will be stored at.
+        - **path**: a string that contains the path to which the tree will be stored at.
     
         '''
         # defualt filepointer.tell() probably will not work as python reads bytes into 
