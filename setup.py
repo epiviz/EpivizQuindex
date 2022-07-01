@@ -7,6 +7,9 @@
     Learn more under: https://pyscaffold.org/
 """
 from setuptools import setup
+import sys, os
+
+sys.path.insert(0, os.path.abspath('../project'))
 
 if __name__ == "__main__":
     try:
