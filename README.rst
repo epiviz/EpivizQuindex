@@ -42,11 +42,13 @@ Usage
 To import the package, simply run:
 
 .. code-block:: python
+
     import EpivizQuindex
 
 Define the genome range, and set the path to a folder where you want to hold the index:
 
 .. code-block:: python
+
     genome = {
         "chr1": 249250621, 
         "chr10": 135534747, 
@@ -80,6 +82,7 @@ Define the genome range, and set the path to a folder where you want to hold the
 Add files to index with a simple function call:
 
 .. code-block:: python
+
     f1 = "/path_to_your_file/some.bigwig"
     f2 = "/path_to_your_file/someOther.bigwig"
     # adding file to index
@@ -89,16 +92,19 @@ Add files to index with a simple function call:
 Invoke the query in a specific chromosome and range:
 
 .. code-block:: python
+
     index.query("chr2", 0, 900000)
 
 You can also require which file you are looking for:
 
 .. code-block:: python
+
     index.query("chr2", 0, 900000, file = f1)
 
-Store the index to disk and load index to memory with ```to_disk()``` and ```from_disk()```:
+Store the index to disk and load index to memory with ``to_disk()`` and ``from_disk()``:
 
 .. code-block:: python
+
     # storing the precomputed index to cwd
     index.to_disk()
     # reading a precomputed set of indecies
@@ -106,7 +112,9 @@ Store the index to disk and load index to memory with ```to_disk()``` and ```fro
     index.from_disk()
 
 We can also perform search without loading the index to memory:
+
 .. code-block:: python
+
     memory = False
     index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
     index.from_disk(load = memory)
