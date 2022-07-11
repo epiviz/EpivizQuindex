@@ -22,7 +22,7 @@ def test_in_memory_query():
     '''
     genome = get_genome('mm10')
 
-    index = EpivizQuindex.EpivizQuindex(genome, base_path=None)
+    index = EpivizQuindex.EpivizQuindex(genome, base_path='./large_test_data/')
     f1 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/VPIA3.bw'
     f2 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/PVM.bw'
     f3 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/OBGL4.bw'
@@ -69,10 +69,10 @@ def test_save_load_file_query():
     index.from_disk()
 
     # querying a range in 1 file
-    assert len(index.query("chr10", 0, 900000, file = f1)) == 1
+    assert len(index.query("chrX", 0, 3195790, file = f1)) == 2
 
     # querying for a range in all files
-    assert len(index.query("chr2", 0, 900000)) == 4
+    assert len(index.query("chrX", 0, 3195790)) == 45
 
     # linking a precomputed set of indecies from cwq
     # note that using load = False, EpvizQuindex does not 
@@ -84,11 +84,11 @@ def test_save_load_file_query():
 
     # querying a range in 1 file without loading it to memory
     # here, the in_memory parameter must be set to false
-    assert len(index.query("chrX", 0, 900000, file = f1, in_memory = memory)) == 1
+    assert len(index.query("chrX", 0, 3195790, file = f1, in_memory = memory)) == 2
 
     # querying for a range in all files without loading it to memory
     # again, the in_memory parameter must be set to false
-    assert len(index.query("chr13", 0, 900000, in_memory = memory)) == 4
+    assert len(index.query("chr13", 0, 3195794, in_memory = memory)) == 444
 
     # remove the folder and path
 

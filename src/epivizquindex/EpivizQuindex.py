@@ -1,12 +1,15 @@
 import os
 from hilbertcurve.hilbertcurve import HilbertCurve
-from epivizquindex.QuadTree import Index
+
 import pickle
 import sys
 import math
 import json
 import pandas
 from epivizquindex.utils import hcoords, range2bbox
+from epivizquindex.QuadTree import Index
+# from utils import hcoords, range2bbox
+# from QuadTree import Index
 from epivizFileParser import BigWig
 from epivizFileParser.utils import toDataFrame
 import struct
@@ -31,7 +34,6 @@ class EpivizQuindex(object):
             Returns:
                     
         '''
-        self.item_size = 72
         self.file_mapping = []
         self.file_objects = {}
         # self.file_chrids = {}

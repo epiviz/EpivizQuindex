@@ -56,12 +56,12 @@ index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
 index.from_disk()
 
 # querying a range in 1 file
-print(index.query("chr10", 0, 900000, file = f1))
+print(len(index.query("chrX", 0, 3195790, file = f1)))
 
 # querying for a range in all files
-print(index.query("chr2", 0, 900000))
+print(len(index.query("chrX", 0, 3195790)))
 
-
+print('pass memory')
 
 # linking a precomputed set of indecies from cwq
 # note that using load = False, EpvizQuindex does not 
@@ -73,11 +73,11 @@ index.from_disk(load = memory)
 
 # querying a range in 1 file without loading it to memory
 # here, the in_memory parameter must be set to false
-print(index.query("chrX", 0, 900000, file = f1, in_memory = memory))
+print(len(index.query("chrX", 0, 3195790, file = f1, in_memory = memory)))
 
 # querying for a range in all files without loading it to memory
 # again, the in_memory parameter must be set to false
-print(index.query("chr13", 0, 900000, in_memory = memory))
+print(len(index.query("chr13", 0, 3195794, in_memory = memory)))
 
 
 for f in os.listdir(base_path):

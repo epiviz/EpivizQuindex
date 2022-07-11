@@ -16,7 +16,8 @@
 # scipy==1.0
 #
 
-epivizfileserver
+epivizfileparser
 shapely
 hilbertcurve
 pandas
+requests

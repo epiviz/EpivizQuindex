@@ -8,9 +8,8 @@ from shapely.geometry import Polygon
 MAX_ITEMS = 256
 MAX_DEPTH = 20
 # size of each item
-item_size = 72
-# leaf_size = 48 + 1 + ((Item_numbers) * item_size)
-# parent_size = 48 + 1 + 32 + ((Item_numbers) * item_size)
+# leaf_size = 48 + 1 + ((Item_numbers) * self.item_size)
+# parent_size = 48 + 1 + 32 + ((Item_numbers) * self.item_size)
 
 def _normalize_rect(rect):
     '''
@@ -63,6 +62,19 @@ class _QuadNode(object):
     def __hash__(self):
         return hash(self.item)
 
+    def pack_items(self, mappings):
+        b_array = bytes()
+        for i, t in zip(self.item, mappings.values()):
+            f = None
+            if t == int:
+                f = 'l'
+            elif t == float:
+                f = 'd'
+            b_array += pack(f, i)
+        return b_array
+
+
+
 class _QuadTree(object):
     """
     Internal backend version of the index.
@@ -71,7 +83,7 @@ class _QuadTree(object):
     user-friendly version.
     """
 
-    def __init__(self, x = None, y = None, width = None, height = None, max_items = None, max_depth = None, _depth=0 , path = None, offset = None):
+    def __init__(self, x = None, y = None, width = None, height = None, max_items = None, max_depth = None, _depth=0 , path = None, offset = None, extra = [], field_str = None):
         '''
         Initialize the current node.
 
@@ -92,16 +104,41 @@ class _QuadTree(object):
         self.children = []
         self.isLeaf = True
         self.center = (x, y)
+        self.extra = {}
         self.width, self.height = width, height
         self.max_items = max_items
         self.max_depth = max_depth
         self._depth = _depth
+        self.item_size = 4 * 8
+        self.field_str = field_str
+        for function in ["start", "end", "offset", "size", "fileid"]:
+
+            self.add_field(function, int)
         if path:
             self._from_disk(path, offset)
 
     def __iter__(self):
         for child in _loopallchildren(self):
             yield child
+
+    def add_field(self, function, t):
+        self.extra[function] = t
+        if t == int or t == float:
+            self.item_size += 8
+        else:
+            exception('type not supported')
+
+    def get_field_str(self):
+        field_str = ""
+        for t in self.extra.values():
+            if t == int:
+                field_str += 'l'
+            elif t == float:
+                field_str += 'd'
+            else:
+                exception('type not supported')
+        return bytes(field_str, 'utf-8')
+
 
     def IsParent(self):
         '''
@@ -203,12 +240,16 @@ class _QuadTree(object):
 
         if not self.isLeaf:
             if self.children[1] and self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1], self.center[0], self.center[1] + self.height/2)):
+                # print(1)
                 self.children[1]._intersect_memory(rect, results)
             if self.children[2] and self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0], self.center[1])):
+                # print(2)
                 self.children[2]._intersect_memory(rect, results)
             if self.children[3] and self.box_intersect(rect, (self.center[0], self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1])):
+                # print(3)
                 self.children[3]._intersect_memory(rect, results)
             if self.children[0] and self.box_intersect(rect, (self.center[0], self.center[1], self.center[0] + self.width/2, self.center[1] + self.height/2)):
+                # print(4)
                 self.children[0]._intersect_memory(rect, results)
 
         for node in self.nodes:
@@ -243,30 +284,36 @@ class _QuadTree(object):
         with open(f_path, 'rb') as f:
             f.seek(offset)
             a = f.read(48 + 1)
-            if offset < 64:
+            if offset < 80:
                 raise Exception()
             (x, y, width, height, depth, num_items, isLeaf) = unpack("ddddll?", a)
+
             # search children
             if not isLeaf:
                 children = unpack("llll", f.read(32))
                 if self.box_intersect(rect, (x - width/2, y, x, y + height/2)):
+                    # print(1)
                     self._intersect_file(rect, f_path,children[1], results)
                 if self.box_intersect(rect, (x - width/2, y - height/2, x, y)):
+                    # print(2)
                     self._intersect_file(rect, f_path, children[2], results)
                 if self.box_intersect(rect, (x, y - height/2, x + width/2, y)):
+                    # print(3)
                     self._intersect_file(rect, f_path, children[3], results)
                 if self.box_intersect(rect, (x, y, x + width/2, y + height/2)):
+                    # print(4)
                     self._intersect_file(rect, f_path, children[0], results)
             nodes = []
             counter = 0
+
             while counter < num_items:
                 counter += 1
-                node = unpack("llllldddd", f.read(72))
-                if node[2] == 0:
+                node_item = unpack(self.field_str, f.read(self.item_size - 4*8))
+                node_rect = unpack("dddd", f.read(4*8))
+                if node_item[2] == 0:
                     break
                 else:
-                    nodes.append(((node[0], node[1], node[2], node[3], node[4]), (node[5], node[6], node[7], node[8])))
-
+                    nodes.append((node_item, node_rect))
             for node in nodes:
                 if self.box_intersect(rect, node[1]):
                     if debug:
@@ -332,9 +379,9 @@ class _QuadTree(object):
             for c in self.children:
                 children_position.append(position)
                 if len(c.children) != 0:
-                    position += 48 + 1 + 32 + (len(c.nodes) * item_size)
+                    position += 48 + 1 + 32 + (len(c.nodes) * self.item_size)
                 elif len(c.nodes) != 0:
-                    position += 48 + 1 + ((len(c.nodes)) * item_size)
+                    position += 48 + 1 + ((len(c.nodes)) * self.item_size)
                 else: 
                     children_position[-1] = -1
             barray += pack('llll', children_position[0], children_position[1], children_position[2], children_position[3])
@@ -347,7 +394,9 @@ class _QuadTree(object):
 
         for node in self.nodes:
             (item, rect) = (node.item, node.rect)
-            barray += pack("llllldddd", item[0], item[1], item[2], item[3], item[4], rect[0], rect[1], rect[2], rect[3])
+            # barray += pack("lllll", item[0], item[1], item[2], item[3], item[4])
+            barray += node.pack_items(self.extra)
+            barray += pack("dddd", rect[0], rect[1], rect[2], rect[3])
         return barray, children, position
 
     def _from_disk(self, f_path, offset):
@@ -373,17 +422,16 @@ class _QuadTree(object):
                 children = unpack("llll", f.read(32))
 
             for x in range(0, num_node):
-                item = unpack("llllldddd", f.read(item_size))
-                node_item = item[0:5]
-                node_rect = item[5:]
-                node = _QuadNode(node_item, node_rect)
+                node = unpack(self.field_str, f.read(self.item_size - 4*8))
+                rect = unpack("dddd", f.read(4*8))
+                node = _QuadNode(node, rect)
                 self.nodes.append(node)
 
         # parse the children outside so that no multiple file pointers opened 
         self.children = []
         for child in children:
             if child != -1:
-                self.children.append(_QuadTree(path = f_path, offset = child))
+                self.children.append(_QuadTree(path = f_path, offset = child, field_str = self.field_str))
             else:
                 self.children.append(None)
 
@@ -455,9 +503,25 @@ class Index(_QuadTree):
         - A list of inserted items whose bounding boxes intersect with the input bbox.
         """
         if in_memory:
-            return self._intersect_memory(bbox, debug = debug)
+            t = self._intersect_memory(bbox, debug = debug)
+            return t
         else:
-            return self._intersect_file(bbox, self.disk, 64, debug = debug)
+            self.read_header()
+            t = self._intersect_file(bbox, self.disk, 80+len(self.field_str), debug = debug)
+            return t
+
+    def read_header(self):
+        header = None
+        with open(self.disk, 'rb') as f:
+            header = unpack('qiiiqqqqqll', f.read(80))
+            (magic, max_item, _, _, x1, y1, x2, y2, _, item_size, field_str_len) = header
+            
+            if magic != 0x45504951:
+                raise Exception("File magic mismatch")
+            self.item_size = item_size
+            self.bbox = (x1, y1, x2, y2)
+            self.max_item = max_item
+            self.field_str = f.read(field_str_len).decode("utf-8")
 
     def from_disk(self, f_path):
         '''
@@ -466,17 +530,10 @@ class Index(_QuadTree):
         - **f_path**: a string containing the path to the precomputed index.
 
         '''
-        header = None
+        self.disk = f_path
+        self.read_header()
         self.nodes = []
-        with open(f_path, 'rb') as f:
-            header = unpack('qiiiqqqqq', f.read(64))
-        (magic, max_item, _, _, x1, y1, x2, y2, _) = header
-        if magic != 0x45504951:
-            raise Exception("File magic mismatch")
-        self.bbox = (x1, y1, x2, y2)
-        self.max_item = max_item
-
-        self._from_disk(f_path, 64)
+        self._from_disk(f_path, 80+len(self.field_str))
 
     def to_disk(self, path):
         '''
@@ -494,13 +551,15 @@ class Index(_QuadTree):
         self.disk = path
         with open(path, 'wb') as f:
             x1, y1, x2, y2 = self.bbox
-            f.write(pack('qiiiqqqqq', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0))
-            position = 64
-            f.seek(64)
+            field_str = self.get_field_str()
+            f.write(pack('qiiiqqqqqll', 0x45504951, MAX_ITEMS, 64, 64,x1,y1,x2,y2,0, self.item_size, len(field_str)))
+            f.write(field_str)
+            position = 80 + len(field_str)
+            f.seek(position)
             if not super(Index, self).IsParent():
-                position += 48 + 1 + 32 + (len(self.nodes) * item_size)
+                position += 48 + 1 + 32 + (len(self.nodes) * self.item_size)
             else:
-                position += 48 + 1 + (len(self.nodes) * item_size)
+                position += 48 + 1 + (len(self.nodes) * self.item_size)
 
             while q:
                 t = q.pop(0)
