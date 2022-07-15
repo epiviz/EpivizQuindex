@@ -18,11 +18,11 @@ def test_get_genome():
 
 def test_in_memory_query():
     '''
-    Test index creation, and in_memory query.
+    Test index creation, and in_memory query. 
     '''
     genome = get_genome('mm10')
 
-    index = EpivizQuindex.EpivizQuindex(genome, base_path=None)
+    index = EpivizQuindex.EpivizQuindex(genome, base_path='./large_test_data/')
     f1 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/VPIA3.bw'
     f2 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/PVM.bw'
     f3 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/OBGL4.bw'
@@ -35,10 +35,10 @@ def test_in_memory_query():
     index.add_to_index(f4)
 
     # querying a range in 1 file
-    assert len(index.query("chr10", 0, 900000, file = f1)) == 1
+    assert len(index.query("chrX", 0, 3195790, file = f1)) == 2
 
     # querying for a range in all files
-    assert len(index.query("chr2", 0, 900000)) == 4
+    assert len(index.query("chrX", 0, 3195790)) == 45
 
 
 
@@ -69,10 +69,10 @@ def test_save_load_file_query():
     index.from_disk()
 
     # querying a range in 1 file
-    assert len(index.query("chr10", 0, 900000, file = f1)) == 1
+    assert len(index.query("chrX", 0, 3195790, file = f1)) == 2
 
     # querying for a range in all files
-    assert len(index.query("chr2", 0, 900000)) == 4
+    assert len(index.query("chrX", 0, 3195790)) == 45
 
     # linking a precomputed set of indecies from cwq
     # note that using load = False, EpvizQuindex does not 
@@ -84,11 +84,45 @@ def test_save_load_file_query():
 
     # querying a range in 1 file without loading it to memory
     # here, the in_memory parameter must be set to false
-    assert len(index.query("chrX", 0, 900000, file = f1, in_memory = memory)) == 1
+    assert len(index.query("chrX", 0, 3195790, file = f1, in_memory = memory)) == 2
 
     # querying for a range in all files without loading it to memory
     # again, the in_memory parameter must be set to false
-    assert len(index.query("chr13", 0, 900000, in_memory = memory)) == 4
+    assert len(index.query("chrX", 0, 3195790, in_memory = memory)) == 45
+
+    # remove the folder and path
+
+    for f in os.listdir(base_path):
+        os.remove(os.path.join(base_path, f))
+
+    os.rmdir(base_path) 
+
+
+def test_in_memory_equal_file_query():
+    '''
+    Test if in_memory query is the same as file_based query.
+    '''
+    genome = get_genome('mm10')
+    base_path='./large_test_data/'
+    index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
+    f1 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/VPIA3.bw'
+    f2 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/PVM.bw'
+    f3 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/OBGL4.bw'
+    f4 = 'http://renlab.sdsc.edu/yangli/downloads/mousebrain/bigwig/OBGL5.bw'
+
+    # adding file to index
+    index.add_to_index(f1)
+    index.add_to_index(f2)
+    index.add_to_index(f3)
+    index.add_to_index(f4)
+
+    index.to_disk()
+
+    # querying a range in 1 file
+    assert index.query("chrX", 0, 3195790, in_memory = False).equals(index.query("chrX", 0, 3195790))
+
+    # querying for a range in all files
+    assert index.query("chrX", 0, 3195790, file = f1, in_memory = False).equals(index.query("chrX", 0, 3195790, file = f1))
 
     # remove the folder and path
 

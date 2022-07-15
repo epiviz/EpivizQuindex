@@ -52,4 +52,4 @@ MANIFEST
 
 
 # large test files
-large_test_data/*
+tests/large_test_data/*

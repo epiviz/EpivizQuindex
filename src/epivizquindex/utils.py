@@ -2,7 +2,35 @@ from hilbertcurve.hilbertcurve import HilbertCurve
 import requests
 import math
 
-avaliable_typles = ['mm10', 'mm9', 'hg19', 'hg38']
+avaliable_typles = ['mm10', 'mm9', 'hg19', 'hg38', 'human']
+
+human_genome = {
+    "chr1": 249250621, 
+    "chr10": 135534747, 
+    "chr11": 135006516, 
+    "chr12": 133851895, 
+    "chr13": 115169878, 
+    "chr14": 107349540, 
+    "chr15": 102531392, 
+    "chr16": 90354753, 
+    "chr17": 81195210, 
+    "chr18": 78077248, 
+    "chr19": 59128983, 
+    "chr2": 243199373, 
+    "chr20": 63025520, 
+    "chr21": 48129895, 
+    "chr22": 51304566, 
+    "chr3": 198022430, 
+    "chr4": 191154276, 
+    "chr5": 180915260, 
+    "chr6": 171115067, 
+    "chr7": 159138663, 
+    "chr8": 146364022, 
+    "chr9": 141213431, 
+    "chrM": 16571, 
+    "chrX": 155270560, 
+    "chrY": 59373566
+}
 
 def hcoords(x, chromLength, dims = 2):
     '''
@@ -113,6 +141,8 @@ def get_genome(t):
     genome = {}
     if t not in avaliable_typles:
         exception('unsupported genome type')
+    if t == 'human':
+        return human_genome
     target_url = "http://hgdownload.cse.ucsc.edu/goldenpath/{}/bigZips/{}.chrom.sizes".format(t, t)
     response = requests.get(target_url)
     data = response.text

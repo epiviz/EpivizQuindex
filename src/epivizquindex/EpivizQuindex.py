@@ -1,12 +1,15 @@
 import os
 from hilbertcurve.hilbertcurve import HilbertCurve
-from epivizquindex.QuadTree import Index
+
 import pickle
 import sys
 import math
 import json
 import pandas
 from epivizquindex.utils import hcoords, range2bbox
+from epivizquindex.QuadTree import Index
+# from utils import hcoords, range2bbox
+# from QuadTree import Index
 from epivizFileParser import BigWig
 from epivizFileParser.utils import toDataFrame
 import struct
@@ -31,7 +34,6 @@ class EpivizQuindex(object):
             Returns:
                     
         '''
-        self.item_size = 72
         self.file_mapping = []
         self.file_objects = {}
         # self.file_chrids = {}
@@ -336,7 +338,7 @@ class EpivizQuindex(object):
                 partial_result = self.fetch_entries(fileid, df, chrm, start, end, zoomlvl)
                 partial_result["file"] = self.file_mapping[fileid]
                 dfs.append(partial_result)
-            return pandas.concat(dfs, axis = 0)
+            return pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
 
 
 # This is aiming for a generic index that can be used for generally all
