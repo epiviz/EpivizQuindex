@@ -338,7 +338,7 @@ class EpivizQuindex(object):
                 partial_result = self.fetch_entries(fileid, df, chrm, start, end, zoomlvl)
                 partial_result["file"] = self.file_mapping[fileid]
                 dfs.append(partial_result)
-            return pandas.concat(dfs, axis = 0)
+            return pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
 
 
 # This is aiming for a generic index that can be used for generally all
