@@ -81,7 +81,7 @@ print("FileParser setup time:", setup_t)
 print("FileParser read time:", read_t)
 
 
-# Quindex 
+# # Quindex 
 
 t = time.time()
 genome = get_genome('mm10')
@@ -106,6 +106,8 @@ read_t = time.time()-t
 print("Quindex setup time:", setup_t)
 print("Quindex in-memory search time:", read_t)
 
+index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
+index.from_disk(load = False)
 
 t = time.time()
 for chromosome, start in queries:
