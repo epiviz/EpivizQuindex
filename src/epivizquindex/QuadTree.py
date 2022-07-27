@@ -5,7 +5,7 @@ import sys
 from struct import *
 from shapely.geometry import Polygon
 
-MAX_ITEMS = 256
+MAX_ITEMS = 50
 MAX_DEPTH = 20
 # size of each item
 # leaf_size = 48 + 1 + ((Item_numbers) * self.item_size)
@@ -44,6 +44,41 @@ def _loopallchildren(parent):
             for subchild in _loopallchildren(child):
                 yield subchild
         yield child
+
+
+def box_intersect(box1, box2):
+    '''
+    Determin whether the two bounding box intersect.
+
+        Parameters:
+        - **box1 (tuple)**: bottom left, top right coordinate of a bounding box.
+        - **box2 (tuple)**: bottom left, top right coordinate of a bounding box.
+
+        Returns:
+        - **box_intersect (bool)**: Whether the two bounding box intersect.
+   
+    '''
+    p1 = Polygon([(box1[0], box1[1]), (box1[0], box1[3]), (box1[2], box1[3]), (box1[2], box1[1])])
+    p2 = Polygon([(box2[0], box2[1]), (box2[0], box2[3]), (box2[2], box2[3]), (box2[2], box2[1])])
+
+    return p1.intersects(p2)
+
+def box_contains(box1, box2):
+    '''
+    Determin whether the box 1 contains box 2.
+
+        Parameters:
+        - **box1 (tuple)**: bottom left, top right coordinate of a bounding box.
+        - **box2 (tuple)**: bottom left, top right coordinate of a bounding box.
+
+        Returns:
+        - **box_contains (bool)**: whether the box 1 contains box 2.
+   
+    '''
+
+    # print(box1, box2)
+    return (box1[0] <= box2[0]) and (box1[1] <= box2[1]) and (box1[2] >= box2[2]) and (box1[3] >= box2[3])
+
 
 class _QuadNode(object):
     '''
@@ -206,24 +241,9 @@ class _QuadTree(object):
                 node = _QuadNode(item, rect)
                 self.nodes.append(node)
 
-    def box_intersect(self, box1, box2):
-        '''
-        Determin whether the two bounding box intersect.
 
-            Parameters:
-            - **box1 (tuple)**: bottom left, top right coordinate of a bounding box.
-            - **box2 (tuple)**: bottom left, top right coordinate of a bounding box.
 
-            Returns:
-            - **box_intersect (bool)**: Whether the two bounding box intersect.
-       
-        '''
-        p1 = Polygon([(box1[0], box1[1]), (box1[0], box1[3]), (box1[2], box1[3]), (box1[2], box1[1])])
-        p2 = Polygon([(box2[0], box2[1]), (box2[0], box2[3]), (box2[2], box2[3]), (box2[2], box2[1])])
-
-        return p1.intersects(p2)
-
-    def _intersect_memory(self, rect, results = None, debug = False):
+    def _intersect_memory(self, rect, results = None, debug = False, parent_contains = False):
         '''
         Recursively return nodes that intersect with the bounding box in memory. This method requires the index preloaded in memory.
 
@@ -238,22 +258,33 @@ class _QuadTree(object):
         if results == None:
             results = []
 
+        contains = parent_contains or box_contains(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1] + self.height/2))
+        # print(contains)
+
+
         if not self.isLeaf:
-            if self.children[1] and self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1], self.center[0], self.center[1] + self.height/2)):
-                # print(1)
-                self.children[1]._intersect_memory(rect, results)
-            if self.children[2] and self.box_intersect(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0], self.center[1])):
-                # print(2)
-                self.children[2]._intersect_memory(rect, results)
-            if self.children[3] and self.box_intersect(rect, (self.center[0], self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1])):
-                # print(3)
-                self.children[3]._intersect_memory(rect, results)
-            if self.children[0] and self.box_intersect(rect, (self.center[0], self.center[1], self.center[0] + self.width/2, self.center[1] + self.height/2)):
-                # print(4)
-                self.children[0]._intersect_memory(rect, results)
+            if (self.children[1] != None) and (contains or box_intersect(rect, (self.center[0] - self.width/2, self.center[1], self.center[0], self.center[1] + self.height/2))):
+                self.children[1]._intersect_memory(rect, results, parent_contains = contains)
+            if (self.children[2] != None) and (contains or box_intersect(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0], self.center[1]))):
+                self.children[2]._intersect_memory(rect, results, parent_contains = contains)
+            if (self.children[3] != None) and (contains or box_intersect(rect, (self.center[0], self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1]))):
+                self.children[3]._intersect_memory(rect, results, parent_contains = contains)
+            if (self.children[0] != None) and (contains or box_intersect(rect, (self.center[0], self.center[1], self.center[0] + self.width/2, self.center[1] + self.height/2))):
+                self.children[0]._intersect_memory(rect, results, parent_contains = contains)
+
+
+        # if not self.isLeaf:
+        #     if self.children[1] and box_intersect(rect, (self.center[0] - self.width/2, self.center[1], self.center[0], self.center[1] + self.height/2)):
+        #         self.children[1]._intersect_memory(rect, results)
+        #     if self.children[2] and box_intersect(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0], self.center[1])):
+        #         self.children[2]._intersect_memory(rect, results)
+        #     if self.children[3] and box_intersect(rect, (self.center[0], self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1])):
+        #         self.children[3]._intersect_memory(rect, results)
+        #     if self.children[0] and box_intersect(rect, (self.center[0], self.center[1], self.center[0] + self.width/2, self.center[1] + self.height/2)):
+        #         self.children[0]._intersect_memory(rect, results)
 
         for node in self.nodes:
-            if self.box_intersect(rect, node.rect):
+            if box_intersect(rect, node.rect):
             # (
                 if debug:
                     results.append(node.item + node.rect)
@@ -261,7 +292,7 @@ class _QuadTree(object):
                     results.append(node.item)
         return results
 
-    def _intersect_file(self, rect, f_path, offset = None, results=None, debug = False):
+    def _intersect_file(self, rect, f_path, offset = None, results=None, debug = False, parent_contains = False):
         '''
         Recursively return nodes that intersect with the bounding box in the index located in a file.
 
@@ -288,21 +319,37 @@ class _QuadTree(object):
                 raise Exception()
             (x, y, width, height, depth, num_items, isLeaf) = unpack("ddddll?", a)
 
+            contains = parent_contains or box_contains(rect, (x - width/2, y - height/2, x + width/2, y + height/2))
+
             # search children
             if not isLeaf:
                 children = unpack("llll", f.read(32))
-                if self.box_intersect(rect, (x - width/2, y, x, y + height/2)):
+                if contains or box_intersect(rect, (x - width/2, y, x, y + height/2)):
                     # print(1)
-                    self._intersect_file(rect, f_path,children[1], results)
-                if self.box_intersect(rect, (x - width/2, y - height/2, x, y)):
+                    self._intersect_file(rect, f_path,children[1], results, parent_contains = contains)
+                if contains or box_intersect(rect, (x - width/2, y - height/2, x, y)):
                     # print(2)
-                    self._intersect_file(rect, f_path, children[2], results)
-                if self.box_intersect(rect, (x, y - height/2, x + width/2, y)):
+                    self._intersect_file(rect, f_path, children[2], results, parent_contains = contains)
+                if contains or box_intersect(rect, (x, y - height/2, x + width/2, y)):
                     # print(3)
-                    self._intersect_file(rect, f_path, children[3], results)
-                if self.box_intersect(rect, (x, y, x + width/2, y + height/2)):
+                    self._intersect_file(rect, f_path, children[3], results, parent_contains = contains)
+                if contains or box_intersect(rect, (x, y, x + width/2, y + height/2)):
                     # print(4)
-                    self._intersect_file(rect, f_path, children[0], results)
+                    self._intersect_file(rect, f_path, children[0], results, parent_contains = contains)
+            # if not isLeaf:
+            #     children = unpack("llll", f.read(32))
+            #     if box_intersect(rect, (x - width/2, y, x, y + height/2)):
+            #         # print(1)
+            #         self._intersect_file(rect, f_path,children[1], results)
+            #     if box_intersect(rect, (x - width/2, y - height/2, x, y)):
+            #         # print(2)
+            #         self._intersect_file(rect, f_path, children[2], results)
+            #     if box_intersect(rect, (x, y - height/2, x + width/2, y)):
+            #         # print(3)
+            #         self._intersect_file(rect, f_path, children[3], results)
+            #     if box_intersect(rect, (x, y, x + width/2, y + height/2)):
+            #         # print(4)
+            #         self._intersect_file(rect, f_path, children[0], results)
             nodes = []
             counter = 0
 
@@ -315,7 +362,7 @@ class _QuadTree(object):
                 else:
                     nodes.append((node_item, node_rect))
             for node in nodes:
-                if self.box_intersect(rect, node[1]):
+                if box_intersect(rect, node[1]):
                     if debug:
                         results.append(node[0] + node[1])
                     else:

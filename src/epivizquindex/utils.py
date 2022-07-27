@@ -147,7 +147,7 @@ def get_genome(t):
     response = requests.get(target_url)
     data = response.text
     for line in data.split('\n'):
-        if 'random' in line or len(line) < 3:
+        if 'random' in line or len(line) < 3 or '_' in line:
             continue
         chrm, num = line.split('\t')
         genome[chrm] = int(num)
