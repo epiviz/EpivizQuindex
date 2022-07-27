@@ -13,6 +13,7 @@ from epivizquindex.QuadTree import Index
 from epivizFileParser import BigWig
 from epivizFileParser.utils import toDataFrame
 import struct
+import time
 
 __author__ = "Jayaram Kancherla"
 __copyright__ = "Jayaram Kancherla"
@@ -272,6 +273,7 @@ class EpivizQuindex(object):
                 result (Data Frame): Data Frame containing the fetched entries sorte by start location.
        
         '''
+
         df_search = df[df["fileid"] == fileid]
         file = self.file_mapping[fileid]
         if self.file_objects.get(file) != None:
@@ -289,8 +291,9 @@ class EpivizQuindex(object):
 
         result = toDataFrame(result, bw.columns)
         result["chr"] = chrm
+        result = result.sort_values(by = ['start'])
 
-        return result.sort_values(by = ['start'])
+        return result
 
     def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file = None):
         '''
