@@ -48,7 +48,7 @@ To import the package, simply run:
     
 
 
-Creating the index
+Create the index
 ====
 
 
@@ -58,8 +58,10 @@ Define the genome range, and set the path to a folder where you want to hold the
     from epivizquindex.utils import get_genome
 
     genome = get_genome('mm10')
-    base_path='indices/'
+    base_path='path-to-indices/'
     index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
+
+base_path should be a folder. If the path does not exist, Quindex will create the path. 
 
 Add files to index with a simple function call:
 
@@ -72,7 +74,7 @@ Add files to index with a simple function call:
     index.add_to_index(f2)
 
 
-Performing in-memory query 
+Performe in-memory query 
 ====
 
 Once the index is created, invoke the query in a specific chromosome and range:
@@ -87,7 +89,7 @@ You can also specify which file you are looking for:
 
     index.query("chr2", 0, 900000, file = f1)
 
-Storing and loading computed index to disk
+Store and load computed index to disk
 ====
 
 Store the index to disk and load index to memory with ``to_disk()`` and ``from_disk()``. The path is the ``base_path`` parameter when creating the index.
@@ -100,7 +102,7 @@ Store the index to disk and load index to memory with ``to_disk()`` and ``from_d
     index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
     index.from_disk()
 
-Performing search without loading
+Perform search without loading
 ====
 
 We can also perform search without loading the index to memory:
