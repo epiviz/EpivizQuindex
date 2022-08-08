@@ -6,6 +6,7 @@ import sys
 import math
 import json
 import pandas
+pandas.set_option('display.width', 1000)
 from epivizquindex.utils import hcoords, range2bbox
 from epivizquindex.QuadTree import Index
 # from utils import hcoords, range2bbox
@@ -363,6 +364,7 @@ class EpivizQuindex(object):
                 dfs.append(partial_result)
     
             dfs = pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
+            dfs["chr"] = chrm
 
             return dfs
 
