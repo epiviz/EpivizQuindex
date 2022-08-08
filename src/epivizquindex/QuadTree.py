@@ -6,7 +6,7 @@ from struct import *
 from shapely.geometry import Polygon
 
 MAX_ITEMS = 50
-MAX_DEPTH = 20
+MAX_DEPTH = 30
 # size of each item
 # leaf_size = 48 + 1 + ((Item_numbers) * self.item_size)
 # parent_size = 48 + 1 + 32 + ((Item_numbers) * self.item_size)

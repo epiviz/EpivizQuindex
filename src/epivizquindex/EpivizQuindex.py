@@ -257,7 +257,7 @@ class EpivizQuindex(object):
                 # print(path, load)
                 self.trees[chrm] = Index(disk = path, first_run = load)
 
-    def fetch_entries(self, fileid, df, chrm, start, end, zoomlvl):
+    def fetch_entries(self, file_name, df, chrm, start, end, zoomlvl):
         '''
         Fetch entries from a file.
 
@@ -274,42 +274,27 @@ class EpivizQuindex(object):
        
         '''
 
-        df_search = df[df["fileid"] == fileid]
-        file = self.file_mapping[fileid]
-        if self.file_objects.get(file) != None:
-            bw = self.file_objects[file]
+        df_search = df[df["file_name"] == file_name]
+        if self.file_objects.get(file_name) != None:
+            bw = self.file_objects[file_name]
         else:
-            bw = BigWig(file)
-            bw.getHeader()
-            bw.getId("chr2")
-            self.file_objects[file] = bw
-        chrmId = bw.chrmIds[chrm]
+            bw = BigWig(file_name)
+            # bw.getHeader()
+            # bw.getId("chr2")
+            self.file_objects[file_name] = bw
+        chrmId = bw.getId(chrm)
 
         result = []
         for i, row in df_search.iterrows():
             result += bw.parseLeafDataNode(chrmId, start, end, zoomlvl, chrmId, row["start"], chrmId, row["end"], row["offset"], row["size"])
 
-        result = toDataFrame(result, bw.columns)
-        result["chr"] = chrm
-        result = result.sort_values(by = ['start'])
+        # result = toDataFrame(result, bw.columns)
+        # result["chr"] = chrm
+        # result = result.sort_values(by = ['start'])
 
-        return result
+        return result, bw.columns
 
-    def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file = None):
-        '''
-        Query the given range in the Quindex.
-
-            Parameters:
-            - **chrm (str)**: target chromosome.
-            - **start (int)**: start location of the query range.
-            - **end (int)**: end location of the query range.
-            - **zoomlvl (int)**: zoom lvl of the query range.
-            - **in_memory (bool)**: Boolean indicating whether the search in performed in memory.
-            - **file (string)**: path to the file. If this is provided, the query will only return searches related to this file.
-
-            Returns:
-                result (Data Frame): Data Frame containing the fetched entries sorte by start location.
-       '''
+    def get_records(self, chrm, start, end, zoomlvl = -2, in_memory = True):
         chromLength = self.genome[chrm]
         dims = 2
         hlevel = math.ceil(math.log2(chromLength)/dims)
@@ -325,23 +310,62 @@ class EpivizQuindex(object):
         xend, yend, _ = hcoords(end, chromLength)
         overlapbbox = range2bbox(hlevel, {"start":start, "end":end}, margin = 0)
         # overlapbbox = (xstart - 1, ystart - 1, end + 1, end + 1)
+        # t = time.time()
         matches = tree.intersect(overlapbbox, in_memory = in_memory)
-
+        # print("tree times: ", time.time() - t)
         df = pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid"])
-        if file:
-            fileid = self.file_mapping.index(file)
-            return self.fetch_entries(fileid, df, chrm, start, end, zoomlvl)
+        df = df.replace({"fileid": {v: k for v, k in enumerate(self.file_mapping)}}).rename(columns={"fileid": "file_name"})
+
+        return df
+
+
+    def has_data(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None):
+        records = self.get_records(chrm, start, end, zoomlvl, in_memory).drop(columns=['offset', 'size'])
+        if file_name:
+            return records.loc[records['file_name'] == file_name]
+        return records
+
+    def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None):
+        '''
+        Query the given range in the Quindex.
+
+            Parameters:
+            - **chrm (str)**: target chromosome.
+            - **start (int)**: start location of the query range.
+            - **end (int)**: end location of the query range.
+            - **zoomlvl (int)**: zoom lvl of the query range.
+            - **in_memory (bool)**: Boolean indicating whether the search in performed in memory.
+            - **file (string)**: path to the file. If this is provided, the query will only return searches related to this file.
+
+            Returns:
+                result (Data Frame): Data Frame containing the fetched entries sorte by start location.
+       '''
+        records = self.get_records(chrm, start, end, zoomlvl, in_memory)
+
+        if file_name:
+            entries, columns = self.fetch_entries(file_name, records, chrm, start, end, zoomlvl)
+            result = toDataFrame(entries, columns)
+            result["chr"] = chrm
+            result = result.sort_values(by = ['start'])
+            return result
             # print(fileid)
             # print(matches)
 
         # returning all files
         else:
             dfs = []
-            for fileid in df.fileid.unique():
-                partial_result = self.fetch_entries(fileid, df, chrm, start, end, zoomlvl)
-                partial_result["file"] = self.file_mapping[fileid]
+            partial_result = []
+            # t = time.time()
+            for file_name in records.file_name.unique():
+                entries, columns = self.fetch_entries(file_name, records, chrm, start, end, zoomlvl)
+                partial_result=pandas.DataFrame(entries, columns=columns)
+                partial_result["file_name"] = file_name
                 dfs.append(partial_result)
-            return pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
+    
+            dfs = pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
+
+            return dfs
+
 
 
 # This is aiming for a generic index that can be used for generally all
