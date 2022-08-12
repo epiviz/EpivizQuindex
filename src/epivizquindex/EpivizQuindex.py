@@ -6,6 +6,7 @@ import sys
 import math
 import json
 import pandas
+import seaborn as sns
 pandas.set_option('display.width', 1000)
 from epivizquindex.utils import hcoords, range2bbox
 from epivizquindex.QuadTree import Index
@@ -367,6 +368,40 @@ class EpivizQuindex(object):
             dfs["chr"] = chrm
 
             return dfs
+
+    def region_plot(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None, num_bins = 100, fig_size = (15,10)):
+        records = self.query(chrm, start, end, in_memory = in_memory)
+
+        entries = {}
+        bin_size = (end-start)/num_bins
+        for file_name in records.file_name.unique():
+            entries[file_name] = []
+            e = records.loc[records['file_name'] == file_name]
+            x = start
+            while x < end:
+                # print(x,min(x+bin_size, end))
+                tb = e.loc[e['start'] <= min(x+bin_size, end)]
+                tb = tb.loc[tb['end'] > x]
+                score = 0
+                pointer = x
+                for i, j in tb.iterrows():
+                    next_pointer = min(x+bin_size, j['end'])
+                    width = next_pointer - pointer
+                    pointer = next_pointer
+                    score += width * j['score']
+                # print(x+bin_size - pointer)
+                score += -(x+bin_size - pointer)
+                entries[file_name].append(score/bin_size)
+                x += bin_size
+        columns = []
+        x = start
+        while x < end:
+            columns.append(min(x+bin_size, end))
+            x += bin_size
+        values = pandas.DataFrame(entries).transpose()
+        values.columns = columns
+        sns.set(rc={'figure.figsize':fig_size})
+        return sns.heatmap(values)
 
 
 
