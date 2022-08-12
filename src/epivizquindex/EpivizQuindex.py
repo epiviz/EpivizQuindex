@@ -369,12 +369,12 @@ class EpivizQuindex(object):
 
             return dfs
 
-    def region_plot(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None, num_bins = 100, fig_size = (15,10)):
+    def plot_helpper(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None, num_bins = 100):
         records = self.query(chrm, start, end, in_memory = in_memory)
 
         entries = {}
         bin_size = (end-start)/num_bins
-        for file_name in records.file_name.unique():
+        for file_name in self.file_mapping:
             entries[file_name] = []
             e = records.loc[records['file_name'] == file_name]
             x = start
@@ -390,7 +390,7 @@ class EpivizQuindex(object):
                     pointer = next_pointer
                     score += width * j['score']
                 # print(x+bin_size - pointer)
-                score += -(x+bin_size - pointer)
+                # score += -(x+bin_size - pointer)
                 entries[file_name].append(score/bin_size)
                 x += bin_size
         columns = []
@@ -400,6 +400,13 @@ class EpivizQuindex(object):
             x += bin_size
         values = pandas.DataFrame(entries).transpose()
         values.columns = columns
+
+        return values
+
+    def region_plot(self, chrm, start, end, meta_data = None, column = 'type', zoomlvl = -2, in_memory = True, file_name = None, num_bins = 100, fig_size = (15,10)):
+        values = self.plot_helpper(chrm, start, end, zoomlvl, in_memory, file_name, num_bins)
+        if meta_data is not None:
+            values = values.join(meta_data[[column]]).groupby(column).mean()
         sns.set(rc={'figure.figsize':fig_size})
         return sns.heatmap(values)
 
