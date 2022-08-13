@@ -1,3 +1,14 @@
+# bw = BigWig("tests/test.bw")
+
+# # extract header and zoom levels from the file
+# print(bw.header, bw.zooms)
+
+# # query the file
+# res, err = bw.getRange(chr="chr1", start=10000000, end=10020000)
+
+
+# local file
+
 from epivizFileParser import BigWig
 from epivizquindex import EpivizQuindex
 from epivizquindex.utils import get_genome
@@ -111,7 +122,7 @@ index.from_disk(load = False)
 
 t = time.time()
 for chromosome, start in queries:
-    dfs = index.has_data(chromosome, start, start + query_range, in_memory = False)
+    dfs = index.has_data(chromosome, start, start + query_range, in_memory = False, file_names = files)
 read_t = time.time()-t
 
 print("Quindex file-based search time:", read_t)
