@@ -321,13 +321,13 @@ class EpivizQuindex(object):
         return df
 
 
-    def has_data(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None):
+    def has_data(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None):
         records = self.get_records(chrm, start, end, zoomlvl, in_memory).drop(columns=['offset', 'size'])
-        if file_name:
-            return records.loc[records['file_name'] == file_name]
+        if file_names is not None:
+            return records.loc[records['file_name'].isin(file_names)]
         return records
 
-    def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None):
+    def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None):
         '''
         Query the given range in the Quindex.
 
@@ -344,30 +344,32 @@ class EpivizQuindex(object):
        '''
         records = self.get_records(chrm, start, end, zoomlvl, in_memory)
 
-        if file_name:
+        # if file_names != None:
+        #     entries, columns = self.fetch_entries(file_names, records, chrm, start, end, zoomlvl)
+        #     result = toDataFrame(entries, columns)
+        #     result["chr"] = chrm
+        #     result = result.sort_values(by = ['start'])
+        #     return result
+        #     # print(fileid)
+        #     # print(matches)
+
+        # # returning all files
+        # else:
+        dfs = []
+        partial_result = []
+        # t = time.time()
+        for file_name in records.file_name.unique():
+            if (file_names is not None) and not (file_name in file_names):
+                continue
             entries, columns = self.fetch_entries(file_name, records, chrm, start, end, zoomlvl)
-            result = toDataFrame(entries, columns)
-            result["chr"] = chrm
-            result = result.sort_values(by = ['start'])
-            return result
-            # print(fileid)
-            # print(matches)
+            partial_result=pandas.DataFrame(entries, columns=columns)
+            partial_result["file_name"] = file_name
+            dfs.append(partial_result)
 
-        # returning all files
-        else:
-            dfs = []
-            partial_result = []
-            # t = time.time()
-            for file_name in records.file_name.unique():
-                entries, columns = self.fetch_entries(file_name, records, chrm, start, end, zoomlvl)
-                partial_result=pandas.DataFrame(entries, columns=columns)
-                partial_result["file_name"] = file_name
-                dfs.append(partial_result)
-    
-            dfs = pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
-            dfs["chr"] = chrm
+        dfs = pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
+        dfs["chr"] = chrm
 
-            return dfs
+        return dfs
 
     def plot_helpper(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None, num_bins = 100):
         records = self.query(chrm, start, end, in_memory = in_memory)
