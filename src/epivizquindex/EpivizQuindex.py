@@ -6,12 +6,15 @@ import sys
 import math
 import json
 import pandas
+import seaborn as sns
+pandas.set_option('display.width', 1000)
 from epivizquindex.utils import hcoords, range2bbox
 from epivizquindex.QuadTree import Index
 # from utils import hcoords, range2bbox
 # from QuadTree import Index
 from epivizFileParser import BigWig
 from epivizFileParser.utils import toDataFrame
+import matplotlib.ticker as ticker
 import struct
 import time
 
@@ -208,11 +211,11 @@ class EpivizQuindex(object):
             # print("\t df shape - ", df.shape)
             for i, row in df_chrmId.iterrows():
                 # x, y, _ = hcoords(row["rStartBase"], chromLength)
-                x_start, y_start, _ = hcoords(row["rStartBase"], chromLength)
-                x_end, y_end, hlevel = hcoords(row["rEndBase"], chromLength)
-                # bbox = range2bbox(hlevel, {"start":row["rStartBase"], "end":row["rEndBase"]})
+                # x_start, y_start, _ = hcoords(row["rStartBase"], chromLength)
+                _, _, hlevel = hcoords(row["rEndBase"], chromLength)
+                bbox = range2bbox(hlevel, {"start":row["rStartBase"], "end":row["rEndBase"]})
                 # print("\t\t bbox", bbox)
-                bbox = (x_start, y_start, x_end, y_end)
+                # bbox = (x_start, y_start, x_end, y_end)
                 tree.insert((row["rStartBase"], row["rEndBase"], row["rdataOffset"], row["rDataSize"], self.file_counter), bbox)
                 # tree.insert((row["rStartBase"], row["rEndBase"], row["rdataOffset"], row["rDataSize"], fileIds[file]), (x, y, x+1, y+1))
             
@@ -257,7 +260,7 @@ class EpivizQuindex(object):
                 # print(path, load)
                 self.trees[chrm] = Index(disk = path, first_run = load)
 
-    def fetch_entries(self, fileid, df, chrm, start, end, zoomlvl):
+    def fetch_entries(self, file_name, df, chrm, start, end, zoomlvl):
         '''
         Fetch entries from a file.
 
@@ -274,42 +277,27 @@ class EpivizQuindex(object):
        
         '''
 
-        df_search = df[df["fileid"] == fileid]
-        file = self.file_mapping[fileid]
-        if self.file_objects.get(file) != None:
-            bw = self.file_objects[file]
+        df_search = df[df["file_name"] == file_name]
+        if self.file_objects.get(file_name) != None:
+            bw = self.file_objects[file_name]
         else:
-            bw = BigWig(file)
-            bw.getHeader()
-            bw.getId("chr2")
-            self.file_objects[file] = bw
-        chrmId = bw.chrmIds[chrm]
+            bw = BigWig(file_name)
+            # bw.getHeader()
+            # bw.getId("chr2")
+            self.file_objects[file_name] = bw
+        chrmId = bw.getId(chrm)
 
         result = []
         for i, row in df_search.iterrows():
             result += bw.parseLeafDataNode(chrmId, start, end, zoomlvl, chrmId, row["start"], chrmId, row["end"], row["offset"], row["size"])
 
-        result = toDataFrame(result, bw.columns)
-        result["chr"] = chrm
-        result = result.sort_values(by = ['start'])
+        # result = toDataFrame(result, bw.columns)
+        # result["chr"] = chrm
+        # result = result.sort_values(by = ['start'])
 
-        return result
+        return result, bw.columns
 
-    def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file = None):
-        '''
-        Query the given range in the Quindex.
-
-            Parameters:
-            - **chrm (str)**: target chromosome.
-            - **start (int)**: start location of the query range.
-            - **end (int)**: end location of the query range.
-            - **zoomlvl (int)**: zoom lvl of the query range.
-            - **in_memory (bool)**: Boolean indicating whether the search in performed in memory.
-            - **file (string)**: path to the file. If this is provided, the query will only return searches related to this file.
-
-            Returns:
-                result (Data Frame): Data Frame containing the fetched entries sorte by start location.
-       '''
+    def get_records(self, chrm, start, end, zoomlvl = -2, in_memory = True, debug = False):
         chromLength = self.genome[chrm]
         dims = 2
         hlevel = math.ceil(math.log2(chromLength)/dims)
@@ -325,23 +313,123 @@ class EpivizQuindex(object):
         xend, yend, _ = hcoords(end, chromLength)
         overlapbbox = range2bbox(hlevel, {"start":start, "end":end}, margin = 0)
         # overlapbbox = (xstart - 1, ystart - 1, end + 1, end + 1)
-        matches = tree.intersect(overlapbbox, in_memory = in_memory)
+        # t = time.time()
+        matches = tree.intersect(overlapbbox, in_memory = in_memory, debug = debug)
+        # print("tree times: ", time.time() - t)
+        df = pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid"]) if not debug else pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid", 'r1', 'r2', 'r3', 'r4'])
+        df = df.loc[df['start'] <= end]
+        df = df.loc[df['end'] >= start]
+        df = df.replace({"fileid": {v: k for v, k in enumerate(self.file_mapping)}}).rename(columns={"fileid": "file_name"})
 
-        df = pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid"])
-        if file:
-            fileid = self.file_mapping.index(file)
-            return self.fetch_entries(fileid, df, chrm, start, end, zoomlvl)
-            # print(fileid)
-            # print(matches)
+        return df
 
-        # returning all files
+
+    def has_data(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None):
+        records = self.get_records(chrm, start, end, zoomlvl, in_memory).drop(columns=['offset', 'size'])
+        if file_names is not None:
+            return records.loc[records['file_name'].isin(file_names)]
+        return records
+
+    def hit(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None):
+        records = self.get_records(chrm, start, end, in_memory=in_memory).drop(columns=['offset', 'size'])
+        file_names = self.file_mapping if file_names == None else file_names
+        result = [len(records.loc[records['file_name'] == f]) > 0 for f in file_names]
+        return pandas.DataFrame({'file_name': file_names, 'hit': result})
+
+    def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None):
+        '''
+        Query the given range in the Quindex.
+
+            Parameters:
+            - **chrm (str)**: target chromosome.
+            - **start (int)**: start location of the query range.
+            - **end (int)**: end location of the query range.
+            - **zoomlvl (int)**: zoom lvl of the query range.
+            - **in_memory (bool)**: Boolean indicating whether the search in performed in memory.
+            - **file (string)**: path to the file. If this is provided, the query will only return searches related to this file.
+
+            Returns:
+                result (Data Frame): Data Frame containing the fetched entries sorte by start location.
+       '''
+        records = self.get_records(chrm, start, end, zoomlvl, in_memory)
+
+        # if file_names != None:
+        #     entries, columns = self.fetch_entries(file_names, records, chrm, start, end, zoomlvl)
+        #     result = toDataFrame(entries, columns)
+        #     result["chr"] = chrm
+        #     result = result.sort_values(by = ['start'])
+        #     return result
+        #     # print(fileid)
+        #     # print(matches)
+
+        # # returning all files
+        # else:
+        dfs = []
+        partial_result = []
+        # t = time.time()
+        for file_name in records.file_name.unique():
+            if (file_names is not None) and not (file_name in file_names):
+                continue
+            entries, columns = self.fetch_entries(file_name, records, chrm, start, end, zoomlvl)
+            partial_result=pandas.DataFrame(entries, columns=columns)
+            partial_result["file_name"] = file_name
+            dfs.append(partial_result)
+
+        dfs = pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
+        dfs["chr"] = chrm
+
+        return dfs.sort_values(by = ['file_name', 'start']) if len(dfs) > 0 else dfs
+
+    def plot_helpper(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None, num_bins = 100, show_missing = True):
+        records = self.query(chrm, start, end, in_memory = in_memory, file_names = file_names)
+        show_missing = -1 if show_missing else 0
+        entries = {}
+        bin_size = (end-start)/num_bins
+        file_names = self.file_mapping if file_names == None else file_names
+        for file_name in file_names:
+            entries[file_name] = []
+            e = records.loc[records['file_name'] == file_name]
+            x = start
+            while x < end:
+                # print(x,min(x+bin_size, end))
+                tb = e.loc[e['start'] <= min(x+bin_size, end)]
+                tb = tb.loc[tb['end'] > x]
+                score = 0
+                pointer = x
+                for i, j in tb.iterrows():
+                    next_pointer = min(x+bin_size, j['end'])
+                    width = next_pointer - pointer
+                    pointer = next_pointer
+                    score += width * j['score']
+                # print(x+bin_size - pointer)
+                
+                if score < 0:
+                    print('file ', file_name, ' score ', score, ' position ', position)
+                score += show_missing * (x+bin_size - pointer)
+                entries[file_name].append(score/bin_size)
+                x += bin_size
+        columns = []
+        formatter = ticker.EngFormatter()
+    
+        x = start
+        while x < end:
+            columns.append(formatter.format_eng(int(min(x+bin_size, end))))
+            x += bin_size
+        values = pandas.DataFrame(entries).transpose()
+        values.columns = columns
+
+        return values
+
+    def region_plot(self, chrm, start, end, meta_data = None, column = 'type', zoomlvl = -2, in_memory = True, file_names = None, num_bins = 100, fig_size = (15,10), show_missing=True):
+        values = self.plot_helpper(chrm, start, end, zoomlvl, in_memory, file_names, num_bins, show_missing)
+        if meta_data is not None:
+            values = values.join(meta_data[[column]]).groupby(column).mean()
+        sns.set(rc={'figure.figsize':fig_size})
+        if show_missing:
+            return sns.heatmap(values, cmap="bwr", center=0, vmin=-1)
         else:
-            dfs = []
-            for fileid in df.fileid.unique():
-                partial_result = self.fetch_entries(fileid, df, chrm, start, end, zoomlvl)
-                partial_result["file"] = self.file_mapping[fileid]
-                dfs.append(partial_result)
-            return pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
+            return sns.heatmap(values, cmap="hot_r")
+
 
 
 # This is aiming for a generic index that can be used for generally all

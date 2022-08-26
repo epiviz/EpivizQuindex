@@ -21,6 +21,7 @@ parser = argparse.ArgumentParser(description='Quindex benchmark.')
 
 parser.add_argument("--query_range", dest='query_range', help="benchmark query range.", default=5000)
 parser.add_argument("--query_times", dest='query_times', help="benchmark query times.", default=10)
+parser.add_argument("--num_file", dest='num_file', help="Number of files used in benchmark.", default=10)
 parser.add_argument("--files_names", dest='files_names', help="benchmark file names.", default='./large_test_data/index')
 parser.add_argument("--files_path", dest='files_path', help="benchmark file folder path.", default='./large_test_data/')
 parser.add_argument("--index_path", dest='index_path', help="benchmark index path.", default='./index_data/')
@@ -36,6 +37,7 @@ files_names = args.files_names
 files_path = args.files_path
 index_path = args.index_path
 remove_index = bool(args.remove_index)
+num_file = int(args.num_file)
 
 if os.path.exists(index_path):
     print("Warning: Index path is not empty. Will load index from index_path")
@@ -48,6 +50,10 @@ with open(files_names, 'r') as f:
     for line in f:
         files.append(line.strip())
 
+if num_file >0:
+    files = random.sample(files, num_file)
+
+print('number of files: ', len(files))
 
 # generate queries
 genomes = get_genome('mm10')
@@ -68,39 +74,44 @@ for f in files:
 setup_t = time.time()-t
 
 t = time.time()
-dfs = []
+
 for chromosome, start in queries:
+    dfs = []
     for bw,f in zip(bws,files):
         res, err = bw.getRange(chr=chromosome, start=start, end=start + query_range, zoomlvl = -2)
         res["file"] = f
         dfs.append(res)
-dfs = pd.concat(dfs, axis = 0)
+    dfs = pd.concat(dfs, axis = 0)
 read_t = time.time()-t
 
+# print(dfs)
 print("FileParser setup time:", setup_t)
 print("FileParser read time:", read_t)
 
 
+
+
 # # Quindex 
 
-t = time.time()
+
 genome = get_genome('mm10')
 base_path=index_path
 
+t = time.time()
 if os.path.exists(index_path):
     index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
     index.from_disk()
 else:
     index = EpivizQuindex.EpivizQuindex(genome, base_path=base_path)
     for f in files:
-        print(f)
+        # print(f)
         index.add_to_index(files_path + f)
     index.to_disk()
 setup_t = time.time()-t
 
 t = time.time()
 for chromosome, start in queries:
-    index.query(chromosome, start, start + query_range)
+    index.has_data(chromosome, start, start + query_range)
 read_t = time.time()-t
 
 print("Quindex setup time:", setup_t)
@@ -111,7 +122,7 @@ index.from_disk(load = False)
 
 t = time.time()
 for chromosome, start in queries:
-    index.query(chromosome, start, start + query_range, in_memory = False)
+    dfs = index.has_data(chromosome, start, start + query_range, in_memory = False, file_names = files)
 read_t = time.time()-t
 
 print("Quindex file-based search time:", read_t)
