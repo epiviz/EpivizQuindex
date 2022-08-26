@@ -14,6 +14,7 @@ from epivizquindex.QuadTree import Index
 # from QuadTree import Index
 from epivizFileParser import BigWig
 from epivizFileParser.utils import toDataFrame
+import matplotlib.ticker as ticker
 import struct
 import time
 
@@ -210,11 +211,11 @@ class EpivizQuindex(object):
             # print("\t df shape - ", df.shape)
             for i, row in df_chrmId.iterrows():
                 # x, y, _ = hcoords(row["rStartBase"], chromLength)
-                x_start, y_start, _ = hcoords(row["rStartBase"], chromLength)
-                x_end, y_end, hlevel = hcoords(row["rEndBase"], chromLength)
-                # bbox = range2bbox(hlevel, {"start":row["rStartBase"], "end":row["rEndBase"]})
+                # x_start, y_start, _ = hcoords(row["rStartBase"], chromLength)
+                _, _, hlevel = hcoords(row["rEndBase"], chromLength)
+                bbox = range2bbox(hlevel, {"start":row["rStartBase"], "end":row["rEndBase"]})
                 # print("\t\t bbox", bbox)
-                bbox = (x_start, y_start, x_end, y_end)
+                # bbox = (x_start, y_start, x_end, y_end)
                 tree.insert((row["rStartBase"], row["rEndBase"], row["rdataOffset"], row["rDataSize"], self.file_counter), bbox)
                 # tree.insert((row["rStartBase"], row["rEndBase"], row["rdataOffset"], row["rDataSize"], fileIds[file]), (x, y, x+1, y+1))
             
@@ -296,7 +297,7 @@ class EpivizQuindex(object):
 
         return result, bw.columns
 
-    def get_records(self, chrm, start, end, zoomlvl = -2, in_memory = True):
+    def get_records(self, chrm, start, end, zoomlvl = -2, in_memory = True, debug = False):
         chromLength = self.genome[chrm]
         dims = 2
         hlevel = math.ceil(math.log2(chromLength)/dims)
@@ -313,9 +314,11 @@ class EpivizQuindex(object):
         overlapbbox = range2bbox(hlevel, {"start":start, "end":end}, margin = 0)
         # overlapbbox = (xstart - 1, ystart - 1, end + 1, end + 1)
         # t = time.time()
-        matches = tree.intersect(overlapbbox, in_memory = in_memory)
+        matches = tree.intersect(overlapbbox, in_memory = in_memory, debug = debug)
         # print("tree times: ", time.time() - t)
-        df = pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid"])
+        df = pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid"]) if not debug else pandas.DataFrame(matches, columns=["start", "end", "offset", "size", "fileid", 'r1', 'r2', 'r3', 'r4'])
+        df = df.loc[df['start'] <= end]
+        df = df.loc[df['end'] >= start]
         df = df.replace({"fileid": {v: k for v, k in enumerate(self.file_mapping)}}).rename(columns={"fileid": "file_name"})
 
         return df
@@ -326,6 +329,12 @@ class EpivizQuindex(object):
         if file_names is not None:
             return records.loc[records['file_name'].isin(file_names)]
         return records
+
+    def hit(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None):
+        records = self.get_records(chrm, start, end, in_memory=in_memory).drop(columns=['offset', 'size'])
+        file_names = self.file_mapping if file_names == None else file_names
+        result = [len(records.loc[records['file_name'] == f]) > 0 for f in file_names]
+        return pandas.DataFrame({'file_name': file_names, 'hit': result})
 
     def query(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None):
         '''
@@ -369,14 +378,15 @@ class EpivizQuindex(object):
         dfs = pandas.concat(dfs, axis = 0) if len(dfs) > 0 else pandas.DataFrame()
         dfs["chr"] = chrm
 
-        return dfs
+        return dfs.sort_values(by = ['file_name', 'start']) if len(dfs) > 0 else dfs
 
-    def plot_helpper(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_name = None, num_bins = 100):
-        records = self.query(chrm, start, end, in_memory = in_memory)
-
+    def plot_helpper(self, chrm, start, end, zoomlvl = -2, in_memory = True, file_names = None, num_bins = 100, show_missing = True):
+        records = self.query(chrm, start, end, in_memory = in_memory, file_names = file_names)
+        show_missing = -1 if show_missing else 0
         entries = {}
         bin_size = (end-start)/num_bins
-        for file_name in self.file_mapping:
+        file_names = self.file_mapping if file_names == None else file_names
+        for file_name in file_names:
             entries[file_name] = []
             e = records.loc[records['file_name'] == file_name]
             x = start
@@ -392,25 +402,33 @@ class EpivizQuindex(object):
                     pointer = next_pointer
                     score += width * j['score']
                 # print(x+bin_size - pointer)
-                # score += -(x+bin_size - pointer)
+                
+                if score < 0:
+                    print('file ', file_name, ' score ', score, ' position ', position)
+                score += show_missing * (x+bin_size - pointer)
                 entries[file_name].append(score/bin_size)
                 x += bin_size
         columns = []
+        formatter = ticker.EngFormatter()
+    
         x = start
         while x < end:
-            columns.append(min(x+bin_size, end))
+            columns.append(formatter.format_eng(int(min(x+bin_size, end))))
             x += bin_size
         values = pandas.DataFrame(entries).transpose()
         values.columns = columns
 
         return values
 
-    def region_plot(self, chrm, start, end, meta_data = None, column = 'type', zoomlvl = -2, in_memory = True, file_name = None, num_bins = 100, fig_size = (15,10)):
-        values = self.plot_helpper(chrm, start, end, zoomlvl, in_memory, file_name, num_bins)
+    def region_plot(self, chrm, start, end, meta_data = None, column = 'type', zoomlvl = -2, in_memory = True, file_names = None, num_bins = 100, fig_size = (15,10), show_missing=True):
+        values = self.plot_helpper(chrm, start, end, zoomlvl, in_memory, file_names, num_bins, show_missing)
         if meta_data is not None:
             values = values.join(meta_data[[column]]).groupby(column).mean()
         sns.set(rc={'figure.figsize':fig_size})
-        return sns.heatmap(values)
+        if show_missing:
+            return sns.heatmap(values, cmap="bwr", center=0, vmin=-1)
+        else:
+            return sns.heatmap(values, cmap="hot_r")
 
 
 

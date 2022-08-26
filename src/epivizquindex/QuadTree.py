@@ -264,13 +264,13 @@ class _QuadTree(object):
 
         if not self.isLeaf:
             if (self.children[1] != None) and (contains or box_intersect(rect, (self.center[0] - self.width/2, self.center[1], self.center[0], self.center[1] + self.height/2))):
-                self.children[1]._intersect_memory(rect, results, parent_contains = contains)
+                self.children[1]._intersect_memory(rect, results, parent_contains = contains, debug = debug)
             if (self.children[2] != None) and (contains or box_intersect(rect, (self.center[0] - self.width/2, self.center[1] - self.height/2, self.center[0], self.center[1]))):
-                self.children[2]._intersect_memory(rect, results, parent_contains = contains)
+                self.children[2]._intersect_memory(rect, results, parent_contains = contains, debug = debug)
             if (self.children[3] != None) and (contains or box_intersect(rect, (self.center[0], self.center[1] - self.height/2, self.center[0] + self.width/2, self.center[1]))):
-                self.children[3]._intersect_memory(rect, results, parent_contains = contains)
+                self.children[3]._intersect_memory(rect, results, parent_contains = contains, debug = debug)
             if (self.children[0] != None) and (contains or box_intersect(rect, (self.center[0], self.center[1], self.center[0] + self.width/2, self.center[1] + self.height/2))):
-                self.children[0]._intersect_memory(rect, results, parent_contains = contains)
+                self.children[0]._intersect_memory(rect, results, parent_contains = contains, debug = debug)
 
 
         # if not self.isLeaf:
@@ -326,16 +326,16 @@ class _QuadTree(object):
                 children = unpack("llll", f.read(32))
                 if contains or box_intersect(rect, (x - width/2, y, x, y + height/2)):
                     # print(1)
-                    self._intersect_file(rect, f_path,children[1], results, parent_contains = contains)
+                    self._intersect_file(rect, f_path,children[1], results, parent_contains = contains, debug = debug)
                 if contains or box_intersect(rect, (x - width/2, y - height/2, x, y)):
                     # print(2)
-                    self._intersect_file(rect, f_path, children[2], results, parent_contains = contains)
+                    self._intersect_file(rect, f_path, children[2], results, parent_contains = contains, debug = debug)
                 if contains or box_intersect(rect, (x, y - height/2, x + width/2, y)):
                     # print(3)
-                    self._intersect_file(rect, f_path, children[3], results, parent_contains = contains)
+                    self._intersect_file(rect, f_path, children[3], results, parent_contains = contains, debug = debug)
                 if contains or box_intersect(rect, (x, y, x + width/2, y + height/2)):
                     # print(4)
-                    self._intersect_file(rect, f_path, children[0], results, parent_contains = contains)
+                    self._intersect_file(rect, f_path, children[0], results, parent_contains = contains, debug = debug)
             # if not isLeaf:
             #     children = unpack("llll", f.read(32))
             #     if box_intersect(rect, (x - width/2, y, x, y + height/2)):
