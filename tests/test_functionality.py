@@ -35,7 +35,7 @@ def test_in_memory_query():
     index.add_to_index(f4)
 
     # querying a range in 1 file
-    assert len(index.query("chrX", 0, 3195790, file = f1)) == 2
+    assert len(index.query("chrX", 0, 3195790, file_names = [f1])) == 2
 
     # querying for a range in all files
     assert len(index.query("chrX", 0, 3195790)) == 45
@@ -69,7 +69,7 @@ def test_save_load_file_query():
     index.from_disk()
 
     # querying a range in 1 file
-    assert len(index.query("chrX", 0, 3195790, file = f1)) == 2
+    assert len(index.query("chrX", 0, 3195790, file_names = [f1])) == 2
 
     # querying for a range in all files
     assert len(index.query("chrX", 0, 3195790)) == 45
@@ -84,7 +84,7 @@ def test_save_load_file_query():
 
     # querying a range in 1 file without loading it to memory
     # here, the in_memory parameter must be set to false
-    assert len(index.query("chrX", 0, 3195790, file = f1, in_memory = memory)) == 2
+    assert len(index.query("chrX", 0, 3195790, file_names = [f1], in_memory = memory)) == 2
 
     # querying for a range in all files without loading it to memory
     # again, the in_memory parameter must be set to false
@@ -122,7 +122,7 @@ def test_in_memory_equal_file_query():
     assert index.query("chrX", 0, 3195790, in_memory = False).equals(index.query("chrX", 0, 3195790))
 
     # querying for a range in all files
-    assert index.query("chrX", 0, 3195790, file = f1, in_memory = False).equals(index.query("chrX", 0, 3195790, file = f1))
+    assert index.query("chrX", 0, 3195790, file_names = [f1], in_memory = False).equals(index.query("chrX", 0, 3195790, file_names = [f1]))
 
     # remove the folder and path
 

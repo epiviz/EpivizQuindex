@@ -87,7 +87,7 @@ You can also specify which file you are looking for:
 
 .. code-block:: python
 
-    index.query("chr2", 0, 900000, file = f1)
+    index.query("chr2", 0, 900000, file_names = [f1])
 
 Store and load computed index to disk
 ====
